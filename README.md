@@ -26,7 +26,19 @@ After running `setup.sh` you should now have an environment that can be used for
 The `web.py` is a simple web application built on `Flask` + `Flask-socketio` which will facilitate real time configuration of the underlying neural net processing.
 
 
-# Appendix T*(roubleshooting)*
+
+
+
+
+### Appendix T*(roubleshooting)*
+
+#### I Can't use matplot lib!
+
+if your on OSX you'll get an error talking about python being installed as a framework.  To get around this, run your script using `sh frameworkpython.sh myscript.py`
+
+This will run the python shipped with OSX but set the home directory to that of our virtual environment.
+
+#### PortAudio on install
 
 There was an issue with installing PyAudio (`missing PortAudio.h`) since we're using our own virtual env:
 
