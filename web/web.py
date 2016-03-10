@@ -5,7 +5,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
-
 class Channel:
     def __init__(self, channelName):
         self.name = channelName
@@ -35,15 +34,17 @@ def adjust_gain(message):
         emit('gain adjusted', message, broadcast=True, include_self=False)
 
 
-@socketio.on('my event', namespace='/test')
-def test_message(message):
-    emit('my response', {'data': message['data']})
+@socketio.on('start', namespace='/test')
+def start_audio():
+    emit('started', {'data': "Started"})
 
+@socketio.on('stop', namespace='/test')
+def stop_audio():
+    emit('stopped', {'data': "Started"})
 
 @socketio.on('my broadcast event', namespace='/test')
 def test_message(message):
     emit('my response', {'data': message['data']}, broadcast=True)
-
 
 @socketio.on('connect', namespace='/test')
 def test_connect():

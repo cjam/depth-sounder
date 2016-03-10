@@ -31,7 +31,6 @@ import audiolazy as lz
 import random, operator, sys, time
 from functools import reduce
 
-
 def ks_synth(freq):
   """
   Synthesize the given frequency into a Stream by using a model based on

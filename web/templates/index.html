@@ -10,10 +10,13 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css"
           integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
 
+    <link href="https://gitcdn.github.io/bootstrap-toggle/2.2.0/css/bootstrap-toggle.min.css" rel="stylesheet">
+
     <script src="https://code.jquery.com/jquery-2.2.1.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
             integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
             crossorigin="anonymous"></script>
+    <script src="https://gitcdn.github.io/bootstrap-toggle/2.2.0/js/bootstrap-toggle.min.js"></script>
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
 
     <link rel="stylesheet" href="/static/slider/slider.css"/>
@@ -79,13 +82,14 @@
             // event handler for server sent data
             // the data is displayed in the "Received" section of the page
             socket.on('gain adjusted', function (msg) {
-                console.log("Gain adjusted",msg);
-                $("#channel-"+msg.channel).val(msg.value);
+                console.log("Gain adjusted", msg);
+                $("#channel-" + msg.channel).val(msg.value);
             });
             // event handler for new connections
             socket.on('connect', function () {
                 socket.emit('my event', {data: 'I\'m connected!'});
             });
+
             // handlers for the different forms in the page
             // these send data to the server in a variety of ways
 
@@ -94,14 +98,56 @@
                 return false;
             });
 
-            $('#eg input').slider().on('slide',function(evt){
+            $('#eg input').slider().on('slide', function (evt) {
                 var message = {
-                    channel:$(this).attr("id").toString().replace("channel-",""),
-                    value:evt.value
+                    channel: $(this).attr("id").toString().replace("channel-", ""),
+                    value: evt.value
                 };
 
-                socket.emit('adjust gain',message);
+                socket.emit('adjust gain', message);
             });
+
+
+            var startToggle = $("#startToggle");
+
+            $("#startToggle").parent().click(function (evt) {
+                var checked = $("#startToggle").prop('checked');
+
+                if(!checked){
+                    console.log("starting audio");
+                    socket.emit('start');
+                }else{
+                    console.log("Stopping audio");
+                    socket.emit('stop');
+                }
+                evt.stopPropagation();
+            });
+
+            socket.on('started', function () {
+                console.log("Started...");
+                startToggle.bootstrapToggle('on');
+            });
+
+            socket.on('stopped', function () {
+                console.log("stopped...");
+                startToggle.bootstrapToggle('off');
+            });
+
+
+//            startToggle.change(function (evt) {
+//                var currentlyChecked = $(this).prop('checked');
+//                console.log("Changed to: ", currentlyChecked);
+//
+//                if (currentlyChecked) {
+//                    socket.emit('start');
+//                } else {
+//                    socket.emit('stop');
+//                }
+//
+//                evt.preventDefault();
+//                evt.stopPropagation();
+//            });
+
         });
 
 
@@ -111,35 +157,42 @@
 <H1>Depth Sounder</H1>
 
 <div class="well">
-    <table id="eg">
-        <tbody>
-        <tr>
-            {% for channel in channels %}
-                <td>
-                    <div class="slider slider-vertical">
-                        <div class="slider-track">
-                            <div class="slider-selection" style="top: 32.5%; height: 67.5%;"></div>
-                            <div class="slider-handle round hide" style="top: 100%;"></div>
-                        </div>
-                        <div class="tooltip right hide" style="left: 100%; top: 52.75px;">
-                            <div class="tooltip-arrow"></div>
-                            <div class="tooltip-inner">-7</div>
-                        </div>
-                        <input id="channel-{{ channel.name }}" type="text" class="span2" value="{{ channel.gain }}" data-slider-min="100" data-slider-max="0"
-                               data-slider-step="1" data-slider-value="{{ channel.gain }}" data-slider-orientation="vertical"
-                               data-slider-selection="after" data-slider-tooltip="hide"></div>
-                </td>
-            {% else %}
-                <td> No Channels Configured :(</td>
-            {% endfor %}
-        </tr>
-        <tr>
-            {% for channel in channels %}
-                <td>{{ channel.name }}</td>
-            {%  endfor %}
-        </tr>
-        </tbody>
-    </table>
+    <input id="startToggle" type="checkbox" data-toggle="toggle"
+           data-off="<i class='fa fa-play'></i> Play"
+           data-on="<i class='fa fa-pause'></i> Stop"
+           data-onstyle="danger"
+           data-offstyle="success">
+    <!--<table id="eg">-->
+        <!--<tbody>-->
+        <!--<tr>-->
+            <!--{% for channel in channels %}-->
+            <!--<td>-->
+                <!--<div class="slider slider-vertical">-->
+                    <!--<div class="slider-track">-->
+                        <!--<div class="slider-selection" style="top: 32.5%; height: 67.5%;"></div>-->
+                        <!--<div class="slider-handle round hide" style="top: 100%;"></div>-->
+                    <!--</div>-->
+                    <!--<div class="tooltip right hide" style="left: 100%; top: 52.75px;">-->
+                        <!--<div class="tooltip-arrow"></div>-->
+                        <!--<div class="tooltip-inner">-7</div>-->
+                    <!--</div>-->
+                    <!--<input id="channel-{{ channel.name }}" type="text" class="span2" value="{{ channel.gain }}"-->
+                           <!--data-slider-min="100" data-slider-max="0"-->
+                           <!--data-slider-step="1" data-slider-value="{{ channel.gain }}"-->
+                           <!--data-slider-orientation="vertical"-->
+                           <!--data-slider-selection="after" data-slider-tooltip="hide"></div>-->
+            <!--</td>-->
+            <!--{% else %}-->
+            <!--<td> No Channels Configured :(</td>-->
+            <!--{% endfor %}-->
+        <!--</tr>-->
+        <!--<tr>-->
+            <!--{% for channel in channels %}-->
+            <!--<td>{{ channel.name }}</td>-->
+            <!--{% endfor %}-->
+        <!--</tr>-->
+        <!--</tbody>-->
+    <!--</table>-->
 </div>
 </body>
 </html>

@@ -26,11 +26,26 @@ After running `setup.sh` you should now have an environment that can be used for
 The `web.py` is a simple web application built on `Flask` + `Flask-socketio` which will facilitate real time configuration of the underlying neural net processing.
 
 
+# Scripts
+
+#### `setup.sh`
+
+Sets up your environment initially to be able to run the python scripts
+
+#### `install.sh`
+
+Installs a package into the environment and exports the list of dependencies to requirements.txt in the root directory
+
+#### `uninstall.sh` 
+
+Uninstalls a package from the environment and exports the list of dependencies to requirements.txt in the root directory
+
+#### `bundle.sh`
+
+Exports the list of dependencies (excluding pyAudio, see [Appendix T](#AppendixT))
 
 
-
-
-### Appendix T*(roubleshooting)*
+### Appendix T*(roubleshooting)* <a name="AppendixT"></a>
 
 #### I Can't use matplot lib!
 
