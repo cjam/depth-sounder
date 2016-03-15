@@ -1,17 +1,13 @@
-from audiolazy import Stream, AudioIO
-from audiolazy.lazy_analysis import maverage, stft, window
-from audiolazy.lazy_misc import sHz, rint
-from nose import with_setup
-from processing.Audio import StreamCollection, LabeledStream
-from processing.Files import get_labeled_wav_stream, get_labeled_wav_streams_iter
+import processing.Config as Config
+from audiolazy import Stream
+from processing.Audio import StreamCollection
+from processing.Files import get_labeled_wav_stream
 import unittest
-import numpy as np
 
-
-def test_LabeledWavStream_labels_work():
-    lstream = get_labeled_wav_stream("../_data/audio/vio/148__[vio][nod][cla]2177__1.wav")
-    assert lstream.labels == ['vio', 'nod', 'cla']
-
+class TestUtilityFunctions(unittest.TestCase):
+    def test_get_labeled_wav_stream(self):
+        lstream = get_labeled_wav_stream(Config.ViolinDir + "148__[vio][nod][cla]2177__1.wav")
+        self.assertSequenceEqual(['vio', 'nod', 'cla'],lstream.labels, "Labels should be extracted from file name")
 
 class TestStreamCollection(unittest.TestCase):
     def test_StreamCollection(self):
@@ -24,7 +20,7 @@ class TestStreamCollection(unittest.TestCase):
         self.assertEquals(c.peek(3), coll.take(3))
 
     def test_StreamCollection_WavStream(self):
-        a = get_labeled_wav_stream("../_data/audio/vio/148__[vio][nod][cla]2177__1.wav")
+        a = get_labeled_wav_stream(Config.ViolinDir + "148__[vio][nod][cla]2177__1.wav")
         collection = StreamCollection(a)
         samples = a.peek(1024)
         self.assertItemsEqual(samples, collection.take(1024))

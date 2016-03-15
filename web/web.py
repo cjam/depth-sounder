@@ -1,14 +1,7 @@
-import threading
-from collections import Iterable
-
-import flask
-import jsonpickle
-from audiolazy.lazy_io import AudioIO
+import processing.Config as Config
 from audiolazy.lazy_wav import WavStream
-from flask import Flask, render_template, jsonify
-from flask_socketio import SocketIO, emit
-from jsonpickle import handlers
-from jsonpickle.pickler import Pickler
+from flask import Flask, render_template
+from flask_socketio import SocketIO
 from processing.Models import Channel, Mixer
 
 app = Flask(__name__)
@@ -55,8 +48,8 @@ def on_disconnect():
 if __name__ == '__main__':
     global mixer
     mixer = Mixer()
-    ch1 = Channel(WavStream("../_data/audio/songs/amy_winehouse/02 - You Know I'm No Good.wav"),name="I'm no good")
-    ch2 = Channel(WavStream("../_data/audio/songs/amy_winehouse/05 - Back To Black.wav"),name="Back to Black")
+    ch1 = Channel(WavStream(Config.SongDir + "amy_winehouse/02 - You Know I'm No Good.wav"),name="I'm no good")
+    ch2 = Channel(WavStream(Config.SongDir + "amy_winehouse/05 - Back To Black.wav"),name="Back to Black")
     mixer.add_channel(ch1)
     mixer.add_channel(ch2)
 
