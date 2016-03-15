@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ENV_BIN="env/bin"
-package="$1"
+package="$@"
 
 "$ENV_BIN/pip" uninstall $package
 

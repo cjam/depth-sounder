@@ -1,105 +1,127 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# This file is part of AudioLazy, the signal processing Python package.
-# Copyright (C) 2012-2014 Danilo de Jesus da Silva Bellini
-#
-# AudioLazy is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, version 3 of the License.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-# Created on Tue Sep 10 18:02:32 2013
-# danilo [dot] bellini [at] gmail [dot] com
-"""
-Voiced "ah-eh-ee-oh-oo" based on resonators at formant frequencies
-"""
 from __future__ import unicode_literals, print_function
-#import threading
-#from audiolazy import sHz, maverage, rint, AudioIO, ControlStream, CascadeFilter, resonator, saw_table, chunks
-#from time import sleep
-#import sys
-from audiolazy.lazy_io import AudioIO
-from audiolazy.lazy_stream import Streamix
+
 import threading
+from collections import Iterable
 
-class AudioSourcePlayer:
-    def __init__(self):
-        self._mixer = Streamix(zero=0)
-        self._thread = threading.Thread(target=self.renderAudio, args=())
-        self.isRunning = False
-        self.samplingRate = 44100
-        self.sources = list()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
-
-    def add(self,audioSource):
-        if isinstance(audioSource,AudioSource):
-            self.sources.append(audioSource)
-
-    def remove(self, audioSource):
-        if isinstance(audioSource, AudioSource) and audioSource in self.sources:
-            self.sources.remove(audioSource)
-
-    def stop(self):
-        # do things
-        if self.isRunning:
-            self.isRunning = False
-
-    def start(self):
-        # do things
-        if not self.isRunning:
-            self.isRunning = True
-            self.thread.daemon = True
-            self.thread.start()
-
-    def renderAudio(self):
-        # s, Hz = sHz(self.samplingRate)
-        # inertia_dur = .5 * s
-        # inertia_filter = maverage(rint(inertia_dur))
-        with AudioIO() as player:
-            player.play(self.mixer)
-
-class AudioSource:
-    def __init__(self):
-        print("Audio source created")
+from audiolazy import Stream
 
 
+class threadsafe_iter:
+    """Takes an iterator/generator and makes it thread-safe by
+    serializing call to the `next` method of given iterator/generator.
+    """
+
+    def __init__(self, it):
+        self.it = it
+        self.lock = threading.Lock()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        with self.lock:
+            return self.it.next()
 
 
+def threadsafe_generator(f):
+    """A decorator that takes a generator function and makes it thread-safe.
+    """
+
+    def g(*a, **kw):
+        return threadsafe_iter(f(*a, **kw))
+
+    return g
+
+class StreamCollection(Stream):
+    def __init__(self, streams):
+        if not isinstance(streams, Iterable):
+            raise Exception("iter not an iterable")
+        if isinstance(streams, Stream):
+            self._streamCollection = [streams]
+        else:
+            self._streamCollection = streams
+
+        # todo: add labels control stream
+
+        def generator():
+            for stream in self._streamCollection:
+                if isinstance(stream, LabeledStream):
+                    print("Stream labels:")
+                    print(stream.labels)
+                    # todo: set value of label control stream
+                for item in stream:
+                    yield item
+
+        super(StreamCollection, self).__init__(generator())
 
 
-# # Script input, change this with symbols from the table below
-# vowels = "aɛiɒu"
+class LabeledStream(Stream):
+    def __init__(self, stream, labels):
+        self.labels = labels
+        super(LabeledStream, self).__init__(stream)
+
 #
-# # Formant table from in http://en.wikipedia.org/wiki/Formant
-# formants = {
-#     "i": [240, 2400],
-#     "y": [235, 2100],
-#     "e": [390, 2300],
-#     "ø": [370, 1900],
-#     "ɛ": [610, 1900],
-#     "œ": [585, 1710],
-#     "a": [850, 1610],
-#     "æ": [820, 1530],
-#     "ɑ": [750, 940],
-#     "ɒ": [700, 760],
-#     "ʌ": [600, 1170],
-#     "ɔ": [500, 700],
-#     "ɤ": [460, 1310],
-#     "o": [360, 640],
-#     "ɯ": [300, 1390],
-#     "u": [250, 595],
-# }
+# class AudioSourcePlayer(object):
+#
+#     def __init__(self):
+#         self.isRunning = False
+#         self.samplingRate = 44100
+#         self.sources = list()
+#
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         self.stop()
+#
+#     def __enter__(self):
+#         print("__enter__")
+#         self._mixer = Streamix(zero=0)
+#         self._thread = threading.Thread(target=self.renderAudio, args=())
+#
+#     def add(self,audioSource):
+#         if isinstance(audioSource,AudioSource):
+#             self.sources.append(audioSource)
+#             # todo: add to mixer
+#
+#     def remove(self, audioSource):
+#         if isinstance(audioSource, AudioSource) and audioSource in self.sources:
+#             self.sources.remove(audioSource)
+#             # todo: remove from mixer
+#
+#     def stop(self):
+#         # do things
+#         if self.isRunning:
+#             self.isRunning = False
+#
+#     def start(self):
+#         # do things
+#         if not self.isRunning:
+#             self.isRunning = True
+#             self.thread.daemon = True
+#             self.thread.start()
+#
+#     def renderAudio(self):
+#         # s, Hz = sHz(self.samplingRate)
+#         # inertia_dur = .5 * s
+#         # inertia_filter = maverage(rint(inertia_dur))
+#         with AudioIO(True) as player:
+#             player.play(self.mixer)
+#
+# class AudioMixer(object):
+#     def __init__(self):
+#         print("AudioMixer")
 #
 #
+# class AudioChannel(object):
+#     def __init__(self):
+#         print("AudioChannel")
+#
+# class BlockProcessor(Stream):
+#     def __init__(self, input_stream):
+#         print("AudioMixer")
+#
+#     # def process(self,block):
+#     #     # todo: process block
+
+
 # class AudioSource:
 #     def __init__(self):
 #         self.thread = threading.Thread(target=self.renderAudio, args=())
