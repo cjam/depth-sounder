@@ -1,61 +1,68 @@
-from flask import Flask, render_template
+import threading
+from collections import Iterable
+
+import flask
+import jsonpickle
+from audiolazy.lazy_io import AudioIO
+from audiolazy.lazy_wav import WavStream
+from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO, emit
+from jsonpickle import handlers
+from jsonpickle.pickler import Pickler
+from processing.Models import Channel, Mixer
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
-
-class Channel:
-    def __init__(self, channelName):
-        self.name = channelName
-        self.gain = 25
-
-
-jazzChannel = Channel("Jazz")
-classChannel = Channel("Classical")
-
-channels = [jazzChannel, classChannel]
-
+global mixer
+mixer = None
 
 @app.route('/')
 def index():
-    return render_template('index.html', channels=channels)
+    global mixer
+    return render_template('index.html', mixer=mixer.as_dict())
 
+@socketio.on('update_channel')
+def update_channel(channel_json):
+    global mixer
+    ch = Channel(**channel_json)
+    mixer.set_channel_state(ch)
+    mixer.push()
 
-@socketio.on('adjust gain', namespace='/test')
-def adjust_gain(message):
-    if message.channel == "Jazz":
-        channelToChange = jazzChannel
-    else:
-        channelToChange = classChannel
+@socketio.on('start_audio')
+def start_audio(message):
+    global mixer
+    mixer.IsPlaying = True
+    mixer.push()
 
-    if channelToChange.gain != message.value:
-        channelToChange.gain = message.value
-        emit('gain adjusted', message, broadcast=True, include_self=False)
+@socketio.on('stop_audio')
+def stop_audio(message):
+    global mixer
+    mixer.IsPlaying = False
+    mixer.push()
 
-
-@socketio.on('my event', namespace='/test')
-def test_message(message):
-    emit('my response', {'data': message['data']})
-
-
-@socketio.on('my broadcast event', namespace='/test')
-def test_message(message):
-    emit('my response', {'data': message['data']}, broadcast=True)
-
-
-@socketio.on('connect', namespace='/test')
-def test_connect():
-    emit('my response', {'data': 'Connected'})
+@socketio.on('connect')
+def on_connect():
+    global mixer
+    mixer.push(True)
     print('Client Connected')
 
-
-@socketio.on('disconnect', namespace='/test')
-def test_disconnect():
-    emit('my response', {'data': 'Connected'})
+@socketio.on('disconnect')
+def on_disconnect():
     print('Client disconnected')
 
-
 if __name__ == '__main__':
+    global mixer
+    mixer = Mixer()
+    ch1 = Channel(WavStream("../_data/audio/songs/amy_winehouse/02 - You Know I'm No Good.wav"),name="I'm no good")
+    ch2 = Channel(WavStream("../_data/audio/songs/amy_winehouse/05 - Back To Black.wav"),name="Back to Black")
+    mixer.add_channel(ch1)
+    mixer.add_channel(ch2)
+
+    # Start our Web app
     socketio.run(app, host='0.0.0.0', debug=True)
+
+    mixer.close()
+
+
