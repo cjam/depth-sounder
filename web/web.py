@@ -16,6 +16,13 @@ def index():
     global mixer
     return render_template('index.html', mixer=mixer.as_dict())
 
+
+@socketio.on('changed',"/device")
+def device_motion_updated(device_info):
+    print device_info
+    # print "Device "+ device_info["id"] +"  moved" + device_info.__str__()
+
+
 @socketio.on('update_channel')
 def update_channel(channel_json):
     global mixer

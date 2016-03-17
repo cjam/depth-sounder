@@ -142,79 +142,6 @@
             var namespace = "/"
             var socket = io.connect('http://' + document.domain + ':' + location.port + namespace);
 
-//            namespace = '/test'; // change to an empty string to use the global namespace
-            // the socket.io documentation recommends sending an explicit package upon connection
-            // this is specially important when using the global namespace
-
-            // event handler for server sent data
-            // the data is displayed in the "Received" section of the page
-//            socket.on('gain adjusted', function (msg) {
-//                console.log("Gain adjusted", msg);
-//                $("#channel-" + msg.channel).val(msg.value);
-//            });
-//            // event handler for new connections
-//            socket.on('connect', function () {
-//                socket.emit('my event', {data: 'I\'m connected!'});
-//            });
-
-            // handlers for the different forms in the page
-            // these send data to the server in a variety of ways
-
-//            $('form#disconnect').submit(function (event) {
-//                socket.emit('disconnect');
-//                return false;
-//            });
-//
-//            $('#eg input').slider().on('slide', function (evt) {
-//                var message = {
-//                    channel: $(this).attr("id").toString().replace("channel-", ""),
-//                    value: evt.value
-//                };
-//
-//                socket.emit('adjust gain', message);
-//            });
-
-
-//            var startToggle = $("#startToggle");
-//
-//            $("#startToggle").parent().click(function (evt) {
-//                var checked = $("#startToggle").prop('checked');
-//
-//                if (!checked) {
-//                    console.log("starting audio");
-//                    socket.emit('start');
-//                } else {
-//                    console.log("Stopping audio");
-//                    socket.emit('stop');
-//                }
-//                evt.stopPropagation();
-//            });
-
-//            socket.on('started', function () {
-//                console.log("Started...");
-//                startToggle.bootstrapToggle('on');
-//            });
-//
-//            socket.on('stopped', function () {
-//                console.log("stopped...");
-//                startToggle.bootstrapToggle('off');
-//            });
-
-
-//            startToggle.change(function (evt) {
-//                var currentlyChecked = $(this).prop('checked');
-//                console.log("Changed to: ", currentlyChecked);
-//
-//                if (currentlyChecked) {
-//                    socket.emit('start');
-//                } else {
-//                    socket.emit('stop');
-//                }
-//
-//                evt.preventDefault();
-//                evt.stopPropagation();
-//            });
-
             // a bit of a hack to avoid emissions
             var isUpdating = false
 
@@ -227,7 +154,7 @@
             function ChannelViewModel(data) {
                 ko.mapping.fromJS(data, {}, this);
                 this.gain.subscribe(function (val) {
-                    console.log("gain changed:",val)
+                    console.log("gain changed:", val)
                     emit('update_channel', ko.mapping.toJS(this))
                 }, this);
 
@@ -258,15 +185,14 @@
 
                 self.apply(data);
 
-                this.isPlaying.subscribe(function(val){
-                    if(val) {
+                this.isPlaying.subscribe(function (val) {
+                    if (val) {
                         emit("start_audio");
-                    }else{
+                    } else {
                         emit("stop_audio");
                     }
                 })
             }
-
 
             // Note: this will block until the server finishes rendering the initial model
             var mixerViewModel;
@@ -276,50 +202,108 @@
                 isUpdating = true;
                 if (!mixerViewModel) {
                     mixerViewModel = new MixerViewModel(data)
-                    ko.applyBindings(mixerViewModel);
+                    ko.applyBindings(mixerViewModel, $("#MixerView")[0]);
                 } else {
                     mixerViewModel.apply(data);
                 }
                 isUpdating = false;
             });
+
+
+            function DeviceMotionAdapter(updateInterval) {
+                self = this;
+
+                this.isSupported = new ko.observable(false);
+                this.isTracking = new ko.observable(false);
+
+                // Check if mobile
+                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && window.DeviceOrientationEvent) {
+                    this.isSupported(true);
+                }
+
+                var deviceInfo = {
+                    motion: {},
+                    orientation: {}
+                }
+
+                var deviceSocket = io("/device")
+                deviceSocket.on('connect', function (evt) {
+                    deviceInfo.id = deviceSocket.id;
+                });
+
+
+                if (this.isSupported()) {
+
+
+                    var pushDeviceInfo = function () {
+                        if (self.isTracking()) {
+                            deviceSocket.emit("changed", deviceInfo);
+                        }
+                    }
+
+                    var handleMotionEvent = function (event) {
+                        deviceInfo.motion = event;
+                    }
+
+                    var handleOrientationEvent = function (event) {
+                        deviceInfo.orientation = event;
+                    }
+
+                    window.addEventListener("devicemotion", handleMotionEvent, true);
+                    window.addEventListener("deviceorientation", handleOrientationEvent, true);
+
+                    updateInterval = updateInterval ? updateInterval : 1000;
+                    setInterval(pushDeviceInfo, updateInterval)
+                }
+            };
+            var deviceMotionAdapter = new DeviceMotionAdapter();
+            ko.applyBindings(deviceMotionAdapter, $("#DeviceInfoView")[0])
         });
     </script>
 </head>
 <body>
 <H1>Depth Sounder</H1>
-<div class="well">
-    <input type="checkbox" data-bind="bootstrapSwitch: isPlaying,attr:{'data-label-text': name}"
-                   data-size="Large"
-                   data-off-text="Play"
-                   data-off-color="success"
-                   data-on-text="Stop"
-                   data-on-Color="danger"
-                   data-label-width="5" />
-</div>
-<div class="well">
-    <table>
-        <tbody>
-        <tr data-bind="foreach: channels">
-            <td style="width:100px;">
-                <div>
-                    <h3 data-bind="text: name"></h3>
-                    <input type="checkbox" data-bind="bootstrapSwitch: enabled,attr:{'data-label-text': name}"
-                           data-size="mini"
-                           data-on-color="success"
-                           data-off-Color="danger"
-                           data-label-width="5" />
-                    <input data-vertical="true" data-bind="slider: gain" min="0.0" step="0.05" max="5.0" data-highlight="true">
-                </div>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+<div id="DeviceInfoView" class="well col-md-4" data-bind="visible:isSupported">
+    <input type="checkbox" data-bind="bootstrapSwitch: isTracking,attr:{'data-label-text': name}"
+           data-size="Large"
+           data-off-text="Track"
+           data-off-color="success"
+           data-on-text="Stop"
+           data-on-Color="danger"
+           data-label="Motion"/>
 </div>
 
+<div id="MixerView">
+    <div class="well col-md-8">
+        <input type="checkbox" data-bind="bootstrapSwitch: isPlaying,attr:{'data-label-text': name}"
+               data-size="Large"
+               data-off-text="Play"
+               data-off-color="success"
+               data-on-text="Stop"
+               data-on-Color="danger"
+               data-label-width="5"/>
+    </div>
+    <div class="well">
+        <table>
+            <tbody>
+            <tr data-bind="foreach: channels">
+                <td style="width:100px;">
+                    <div>
+                        <h3 data-bind="text: name"></h3>
+                        <input type="checkbox" data-bind="bootstrapSwitch: enabled,attr:{'data-label-text': name}"
+                               data-size="mini"
+                               data-on-color="success"
+                               data-off-Color="danger"
+                               data-label-width="5"/>
+                        <input data-vertical="true" data-bind="slider: gain" min="0.0" step="0.05" max="5.0"
+                               data-highlight="true">
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
 
-<pre>
-{{ mixer | tojson }}
-</pre>
-
+</div>
 </body>
 </html>
