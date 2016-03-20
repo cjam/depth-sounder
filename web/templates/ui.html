@@ -1,0 +1,92 @@
+{% extends('base.html') %}
+{% block stylesheets %}
+
+<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css"/>
+
+{{ super() }}
+
+<link href="/static/switch/css/bootstrap-switch.min.css" rel="stylesheet">
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+<script src="/static/jquery-mobile-ext/vertical-slider-extension.js"></script>
+<script src="/static/switch/js/bootstrap-switch.min.js"></script>
+
+<script type="text/javascript">
+
+    $(document).ready(function(){
+
+        // Note this will block until the server has rendered the json
+        var mixerData = {{ mixer|tojson|safe }}
+
+        var mixerViewModel = new MixerViewModel(mixerData);
+
+        ko.applyBindings(mixerViewModel,$("#MixerView")[0]);
+
+        var deviceMotionAdapter = new DeviceMotionAdapter();
+        ko.applyBindings(deviceMotionAdapter, $("#DeviceInfoView")[0]);
+
+    });
+
+</script>
+
+{% endblock %}
+
+
+{% block page_style %}
+{{ super() }}
+{% endblock %}
+
+
+
+
+{% block content %}
+<div id="DeviceInfoView" class="well col-md-4" data-bind="visible:isSupported">
+    <input type="checkbox" data-bind="bootstrapSwitch: isTracking,attr:{'data-label-text': name}"
+           data-size="Large"
+           data-off-text="Track"
+           data-off-color="success"
+           data-on-text="Stop"
+           data-on-Color="danger"           data-label="Motion"/>
+    <span data-bind="text:motion.position.x"></span>
+    <span data-bind="text:motion.position.y"></span>
+    <span data-bind="text:motion.position.z"></span>
+</div>
+
+
+<div id="MixerView">
+    <div class="well">
+        <input type="checkbox" data-bind="bootstrapSwitch: isPlaying,attr:{'data-label-text': name}"
+               data-size="Large"
+               data-off-text="Play"
+               data-off-color="success"
+               data-on-text="Stop"
+               data-on-Color="danger"
+               data-label-width="5"/>
+    </div>
+    <div class="well">
+        <table>
+            <tbody>
+            <tr data-bind="foreach: channels">
+                <td style="width:100px;">
+                    <div>
+                        <h3 data-bind="text: name"></h3>
+                        <input type="checkbox" data-bind="bootstrapSwitch: enabled,attr:{'data-label-text': name}"
+                               data-size="mini"
+                               data-on-color="success"
+                               data-off-Color="danger"
+                               data-label-width="5"/>
+                        <input data-vertical="true" data-bind="slider: gain" min="0.0" step="0.05" max="5.0"
+                               data-highlight="true">
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

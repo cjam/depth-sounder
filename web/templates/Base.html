@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Depth Sounder</title>
+
+    {% block stylesheets %}
+    <!-- Default Style Sheets -->
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
+          integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous"/>
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css"
+          integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous"/>
+    {% endblock %}
+
+    {% block scripts %}
+    <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+        integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
+        crossorigin="anonymous"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+
+    <script src="/static/hammer.min.js"></script>
+    <script src="/static/hammer-time.min.js"></script>
+    <script src="/static/rx.all.js"></script>
+    <script src="/static/knockout-extensions.js"></script>
+    <script type="text/javascript" src="/static/ViewModels.js"></script>
+    {% endblock %}
+
+    <style>
+        {% block page_style %}
+           .no-select {
+              -webkit-touch-callout: none; /* iOS Safari */
+              -webkit-user-select: none;   /* Chrome/Safari/Opera */
+              -khtml-user-select: none;    /* Konqueror */
+              -moz-user-select: none;      /* Firefox */
+              -ms-user-select: none;       /* IE/Edge */
+              user-select: none;           /* non-prefixed version, currently
+                                              not supported by any browser */
+            }
+            footer {
+                margin-left:1%;
+            }
+        {% endblock %}
+    </style>
+
+</head>
+<body>
+{% block body %}
+<h1>Depth Sounder</h1>
+<div id="content" class="well">{% block content %}{% endblock %}</div>
+<footer class="footer">
+    <p class="text-muted">
+        {% block footer %}
+        &copy; Copyright 2016 by Colter McQuay
+        {% endblock %}
+    </p>
+</footer>
+{% endblock %}
+</body>
+</html>

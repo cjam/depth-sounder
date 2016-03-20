@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+
+{% block scripts %}
+{{ super() }}
+<script src="//cdn.rawgit.com/hammerjs/touchemulator/0.0.2/touch-emulator.js"></script>
+<script src="//d3js.org/d3.v3.min.js"></script>
+{% endblock %}
+
+{% block page_style %}
+body {
+margin: 0;
+overflow:hidden;
+background: #222;
+}
+
+#visual {
+background: #222;
+margin:0;
+cursor:crosshair;
+}
+
+rect {
+fill: none;
+pointer-events: all;
+}
+
+circle {
+fill: none;
+stroke-width: 2.5px;
+}
+{% endblock %}
+
+{% block body %}
+<button id="FullScreenButton"
+        data-bind="visible:isSupported, click:enterFullScreen"
+        class="btn-primary btn-lg">Full Screen
+</button>
+<svg id="visual" class="no-select"></svg>
+<script>
+
+    // todo: figure this out to allow for desktop code to be the same
+    //    var touchEmulator = new TouchEmulator();
+
+    var fullScreenViewModel = new FullScreenViewModel($("#visual")[0])
+    ko.applyBindings(fullScreenViewModel, $("#FullScreenButton")[0])
+
+    // prevent the default ios behavior
+    document.ontouchmove = function (event) {
+        event.preventDefault();
+    }
+
+    function enterFullscreen(element) {
+
+    }
+
+    function resizeVisual() {
+        var width = window.innerWidth, height = window.innerHeight;
+        $("#visual").width(width).height(height);
+    }
+
+    window.onresize = function (evt) {
+        resizeVisual();
+    };
+
+    // Force the visual to size everything initially
+    resizeVisual();
+
+    var visual = $("#visual")[0]
+    var svg = d3.select(visual);
+
+    enterFullscreen(visual);
+
+    var hammerOptions = {};
+    var hammer = new Hammer(visual, hammerOptions);
+
+    var i = 0;
+
+    function applyMovement(x, y) {
+        svg.insert("circle", "rect")
+                .attr("cx", x)
+                .attr("cy", y)
+                .attr("r", 1e-6)
+                .style("stroke", d3.hsl((i = (i + 1) % 360), 1, .5))
+                .style("stroke-opacity", 1)
+                .transition()
+                .duration(2000)
+                .ease(Math.sqrt)
+                .attr("r", 100)
+                .style("stroke-opacity", 1e-6)
+                .remove();
+    }
+
+    socket.on("moved", function (data) {
+        applyMovement(data.ratioX*window.innerWidth, data.ratioY*window.innerHeight);
+    });
+
+
+    hammer.on('pan', function (ev) {
+        var x = ev.center.x, y = ev.center.y;
+        socket.emit("move", {ratioX: x / window.innerWidth, ratioY: y / window.innerHeight})
+        applyMovement(x, y);
+    });
+
+
+    hammer.on('swipe', function (ev) {
+        switch (ev.direction) {
+            case 2: // left
+                console.log("Swipe Left");
+                break;
+            case 4: // right
+                console.log("swipe Right")
+                break;
+            case 8: // up
+                console.log("swipe up");
+                break;
+            case 16: // Down
+                console.log("swipe down");
+                break;
+            default:
+                console.log("Unknown swipe");
+                break;
+        }
+    })
+
+
+    //    svg.selectAll("circle")
+    //            .data(nodes.slice(1))
+    //            .enter().append("circle")
+    //            .attr("r", function (d) {
+    //                return d.radius;
+    //            })
+    //            .style("fill", function (d, i) {
+    //                return color(i % 3);
+    //            });
+    //
+    //    force.on("tick", function (e) {
+    //        var q = d3.geom.quadtree(nodes),
+    //                i = 0,
+    //                n = nodes.length;
+    //
+    //        while (++i < n) q.visit(collide(nodes[i]));
+    //
+    //        svg.selectAll("circle")
+    //                .attr("cx", function (d) {
+    //                    return d.x;
+    //                })
+    //                .attr("cy", function (d) {
+    //                    return d.y;
+    //                });
+    //    });
+    //
+    //    function collide(node) {
+    //        var r = node.radius + 16,
+    //                nx1 = node.x - r,
+    //                nx2 = node.x + r,
+    //                ny1 = node.y - r,
+    //                ny2 = node.y + r;
+    //        return function (quad, x1, y1, x2, y2) {
+    //            if (quad.point && (quad.point !== node)) {
+    //                var x = node.x - quad.point.x,
+    //                        y = node.y - quad.point.y,
+    //                        l = Math.sqrt(x * x + y * y),
+    //                        r = node.radius + quad.point.radius;
+    //                if (l < r) {
+    //                    l = (l - r) / l * .5;
+    //                    node.x -= x *= l;
+    //                    node.y -= y *= l;
+    //                    quad.point.x += x;
+    //                    quad.point.y += y;
+    //                }
+    //            }
+    //            return x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1;
+    //        };
+    //    }
+
+</script>
+{% endblock %}
+

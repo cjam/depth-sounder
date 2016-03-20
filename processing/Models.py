@@ -5,6 +5,7 @@ from collections import Iterable
 from audiolazy.lazy_io import AudioIO
 from audiolazy.lazy_stream import ControlStream, Stream, Streamix
 from flask.ext.socketio import emit
+from processing.NeuralNet import Model
 
 KEYNOTFOUND = '<KEYNOTFOUND>'  # KeyNotFound for dictDiff
 
@@ -29,9 +30,10 @@ def dict_diff(first, second):
             diff[key] = (KEYNOTFOUND, second[key])
     return diff
 
-
 def to_bool(val):
     return val in ['true', 'True', '1', 1, 'y', 'yes', 'Y']
+
+# TODO: MAKE ALL OF THE JSON STUFF MORE GENRIC WITH DECORATORS?
 
 
 class ModelBase(object):
@@ -46,14 +48,12 @@ class ModelBase(object):
     def as_dict(self):
         return {"id": self.id}
 
-
 class Channel(ModelBase):
     def __init__(self, stream=Stream(0), **kwargs):
         self._gainControl = ControlStream(1.0)
         self._enabledControl = ControlStream(1)
         self.name = "channel"
         self.channelStream = stream * self._gainControl * self._enabledControl
-
         # Calling super here will call the base model class
         # and ultimately call set_state
         super(Channel, self).__init__(**kwargs)
@@ -102,6 +102,31 @@ class Channel(ModelBase):
         state["gain"] = self.Gain
         state["enabled"] = self.Enabled
         return state
+
+class NeuralNetChannel(Channel):
+
+    def __init__(self, model):
+        if not isinstance(model,Model):
+            raise TypeError("model should be a processing.NeuralNet.Model")
+
+        self._x = 0.0
+
+    @property
+    def X(self):
+        return self._x
+
+    @X.setter
+    def X(self, value):
+        self._x = value
+
+    def set_state(self, kwargs):
+        state = super(NeuralNetChannel,self).set_state(kwargs)
+        if kwargs.has_key("x"):
+            self.X = kwargs["x"]
+
+    def as_dict(self):
+        state = super(NeuralNetChannel,self).as_dict()
+        state["x"] = self.X
 
 
 class Mixer(ModelBase):
