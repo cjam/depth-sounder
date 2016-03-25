@@ -50,6 +50,8 @@ class ModelBase(object):
 
 class Channel(ModelBase):
     def __init__(self, stream=Stream(0), **kwargs):
+        self._x = ControlStream(0.0);
+        self._y = ControlStream(0.0);
         self._gainControl = ControlStream(1.0)
         self._enabledControl = ControlStream(1)
         self.name = "channel"
@@ -60,6 +62,31 @@ class Channel(ModelBase):
 
     def get_stream(self):
         return self.channelStream
+
+    @property
+    def X(self):
+        return self._x.value;
+
+    @X.setter
+    def X(self, val):
+        # todo: determine whether we want int or float
+        current = self.X
+        if current != val:
+            self._x.value = val
+            print("Channel " + self.name + " x set to " + val.__str__())
+
+    @property
+    def Y(self):
+        return self._y.value;
+
+    @Y.setter
+    def Y(self, val):
+        # todo: determine whether we want int or float
+        current = self.Y
+        if current != val:
+            self._y.value = val
+            print("Channel " + self.name + " y set to " + val.__str__())
+
 
     @property
     def Gain(self):
@@ -96,11 +123,19 @@ class Channel(ModelBase):
         if kwargs.has_key("enabled"):
             self.Enabled = to_bool(kwargs["enabled"])
 
+        if kwargs.has_key("x"):
+            self.X = kwargs["x"]
+
+        if kwargs.has_key("y"):
+            self.Y = kwargs["y"]
+
     def as_dict(self):
         state = super(Channel, self).as_dict()
         state["name"] = self.name
         state["gain"] = self.Gain
         state["enabled"] = self.Enabled
+        state["x"] = self.X;
+        state["y"] = self.Y;
         return state
 
 class NeuralNetChannel(Channel):
@@ -179,8 +214,11 @@ class Mixer(ModelBase):
                                                                                                 Channel) else {}
         ch = self._get_channel(ch_state)
         if ch is not None:
-            print "Changed channel state ('" + ch.name + "'): " + dict_diff(ch.as_dict(), ch_state).__str__()
+            changes = dict_diff(ch.as_dict(), ch_state)
+            if len(changes) > 0:
+                print "Changed channel state ('" + ch.name + "'): " + changes.__str__()
             ch.set_state(ch_state)
+            emit("channel_changed",ch.as_dict(),broadcast=True,include_self=False)
 
     def _get_channel(self, model):
         ch_id = model.get("id", -1) if isinstance(model, dict) else model.id if isinstance(model, ModelBase) else -1
@@ -193,7 +231,7 @@ class Mixer(ModelBase):
         return state
 
     def push(self, include_self=False):
-        emit("model_changed", self.as_dict(), broadcast=True, include_self=include_self)
+        emit("mixer_changed", self.as_dict(), broadcast=True, include_self=include_self)
 
     def get_stream(self):
         return self._smix

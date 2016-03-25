@@ -46,17 +46,7 @@ function MixerViewModel(data) {
     var self = this;
 
     // mapping for object model binding
-    var mapping = {
-        'channels': {
-            key: function (data) {
-                console.log("Channel", data)
-                return ko.utils.unwrapObservable(data.id)
-            }
-            , create: function (options) {
-                return new ChannelViewModel(options.data);
-            }
-        }
-    }
+    var mapping =
 
     self.apply = function (data) {
         ko.mapping.fromJS(data, mapping, self);

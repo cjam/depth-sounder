@@ -1,0 +1,22 @@
+{
+  "name": "depth-sounder-client",
+  "version": "1.0.0",
+  "description": "HTML based clients for the depth-sounder project",
+  "main": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cjam/depth-sounder"
+  },
+  "keywords": [
+    "neural network",
+    "neural",
+    "neural net",
+    "audio",
+    "recurrent"
+  ],
+  "author": "Colter McQuay",
+  "license": "ISC"
+}

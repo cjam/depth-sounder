@@ -16,6 +16,7 @@
     {% endblock %}
 
     {% block scripts %}
+    <!-- todo: Get Javascript module Loading system setup (bower, systemjs, etc.)-->
     <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
         integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
@@ -28,8 +29,9 @@
     <script src="/static/hammer.min.js"></script>
     <script src="/static/hammer-time.min.js"></script>
     <script src="/static/rx.all.js"></script>
-    <script src="/static/knockout-extensions.js"></script>
-    <script type="text/javascript" src="/static/ViewModels.js"></script>
+    <script src="/static/clients/Components.js" />
+    <script src="/static/clients/knockout-extensions.js"></script>
+    <script src="/static/clients/ViewModels.js"></script>
     {% endblock %}
 
     <style>
@@ -54,6 +56,7 @@
 {% block body %}
 <h1>Depth Sounder</h1>
 <div id="content" class="well">{% block content %}{% endblock %}</div>
+
 <footer class="footer">
     <p class="text-muted">
         {% block footer %}
@@ -62,5 +65,9 @@
     </p>
 </footer>
 {% endblock %}
+<script type="text/javascript">
+    ko.applyBindings();
+</script>
 </body>
+
 </html>
