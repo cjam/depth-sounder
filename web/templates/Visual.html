@@ -9,194 +9,75 @@
 
 {% block page_style %}
 body {
-margin: 0;
-overflow:hidden;
-background: #FFF;
+    margin: 0;
+    overflow:hidden;
+    background: #222;
 }
 
-#visual {
-background: inherit;
-margin:0;
-cursor:crosshair;
-position:absolute;
-top:0px;
-left:0px;
+#visualRoot {
+    background: inherit;
+    margin:0;
+    position:absolute;
+    top:0px;
+    left:0px;
 }
 
 #controls{
-position:absolute;
-top:0px;
-left:0px;
+    position:absolute;
+    top:0px;
+    left:0px;
 }
 
-rect {
-fill: none;
-pointer-events: all;
-}
 
 circle {
-fill: none;
-stroke-width: 2.5px;
+    fill: transparent;
+    stroke-width: 2.5px;
+    stroke:#550000;
+    opacity:1;
 }
 
+<!--circle.channel{-->
+    <!--opacity:1.0;-->
+<!--}-->
 
-circle.channel{
-fill:#FF0000;
 
-}
 
 {% endblock %}
 
 {% block body %}
-<svg id="visual" class="no-select"></svg>
+<svg id="visualRoot" class="no-select" ></svg>
 <div id="controls" class="no-select">
-    <button id="FullScreenButton"
-            data-bind="visible:isSupported, click:enterFullScreen"
-            class="btn-primary btn-lg">Full Screen
-    </button>
+    <fullscreen-button params='target:"#visualRoot"'/>
 </div>
-<script>
-
-    var mixerViewModel;
-
-    $(document).ready(function () {
-        var visualId = "#visual"
-
-        var visualNode = $(visualId)[0];
-
-        // Note this will block until the server has rendered the json
-        var mixerData = {{ mixer | tojson | safe }}
-
-        mixerViewModel = new MixerViewModel(mixerData);
-//        ko.applyBindings(mixerViewModel, visualNode);
-
-//        var deviceMotionAdapter = new DeviceMotionAdapter();
-//        ko.applyBindings(deviceMotionAdapter, $("#DeviceInfoView")[0]);
-
-
-        // todo: figure this out to allow for desktop code to be the same
-        //    var touchEmulator = new TouchEmulator();
-
-        var fullScreenViewModel = new FullScreenViewModel(visualNode)
-        ko.applyBindings(fullScreenViewModel, $("#FullScreenButton")[0])
+<script type="text/javascript" src="/static/clients/Visual.js"></script>
+<script type="text/javascript">
+    $(document).ready(function(){
 
         // prevent the default ios behavior
         document.ontouchmove = function (event) {
             event.preventDefault();
         }
 
-        function resizeVisual() {
-            var width = window.innerWidth, height = window.innerHeight;
-            $(visualId).width(width).height(height);
-        }
+        // Note this will block until the server has rendered the json
+        var mixerViewModel = new MixerViewModel({{ mixer | tojson | safe }})
 
-        window.onresize = function (evt) {
-            resizeVisual();
-        };
-
-        // Force the visual to size everything initially
-        resizeVisual();
-
-        var svg = d3.select(visualNode);
-
-        var hammerOptions = {};
-        var hammer = new Hammer(visual, hammerOptions);
-
-        var drag = d3.behavior.drag()
-                .origin(Object)
-                .on("drag", function (d) {
-                    // Update the view model
-//            	    d.x(parseInt(d.x()) + d3.event.dx);
-//				    d.y(parseInt(d.y()) + d3.event.dy);
-                });
-
-        function ChannelsD3View(observableChannels) {
-            var self = this;
-            var chHammerOptions = {
-                recognizers: [
-                    [Hammer.Pinch, {enable: true}],
-                    [Hammer.Tap, {event:"doubletap",enable:true,taps:2}]
-                ]
-            };
-            var addHammerEvents = function (instance, channel) {
-
-                Hammer(instance, chHammerOptions).on("doubletap", function (evt) {
-                    var enabled = !channel.enabled();
-                    channel.enabled(enabled);
-                }).on("pinch", function (evt) {
-                    channel.gain(evt.scale);
-                })
-            }
-
-            self.apply = function (channelViewModels) {
-                var numChannels = channelViewModels.length;
-
-                // Join elements with data
-                var channels = svg.selectAll(".channel")
-                        .data(channelViewModels, function (d) {
-                            return d.id();
-                        });
-                // Create new elements by transitioning them in
-                channels.enter()
-                        .append("circle")
-                        .attr("class", "channel")
-                        .attr("id", function (d) {
-                            return d.id();
-                        })
-                        .attr("opacity", 0.0)
-                        .transition()
-                        .duration(1000)
-                        .attr("opacity", 0.5)
-                        .each(function (d, i) {
-                            addHammerEvents(this, d);
-                        });
-
-                // Update existing ones by setting their x, y, etc
-                channels.attr("cx", function (d, i) {
-                            return (window.innerWidth / (numChannels + 1)) * i;
-                        })
-                        .attr("cy", function (d, i) {
-                            return window.innerHeight / 2;
-                        })
-                        .attr("r", function (d) {
-                            return d.gain() * 50;
-                        })
-                        .attr('fill-opacity',function(d){
-                            if(d.enabled()){
-                                return 0.8;
-                            }else{
-                                return 0.2
-                            }
-                        })
-                        .call(drag);
-
-                channels.exit().remove();
-            }
-
-            var subs = []; // for keeping track of subscriptions
-            // Listen for changes to the view model data...
-            observableChannels.subscribe(function (channels) {
-                self.apply(channels);
-                // Dispose any existing subscriptions
-                ko.utils.arrayForEach(subs, function (sub) {
-                    sub.dispose();
-                });
-                // And create new ones...
-                ko.utils.arrayForEach(channels, function (channel) {
-                    subs.push(channel.data.subscribe(function () {
-                        self.apply(channels);
-                    }));
-                });
-            });
-        }
+        var view = new MixerVisual({svgId:"visualRoot"},mixerViewModel);
 
 
-        var channelView = new ChannelsD3View(mixerViewModel.channels);
-
-
-//        var i = 0;
+//        var hammerOptions = {};
 //
+//        var visual = $("#visualRoot")
+//        visual.height(window.innerHeight);
+//        visual.width(window.innerWidth);
+//
+//        var hammer = new Hammer(visual[0], hammerOptions);
+//
+//        var svg = d3.select(visual[0]);
+//
+//
+//        var i = 0;
 //        function applyMovement(x, y) {
+//
 //            svg.insert("circle", "rect")
 //                    .attr("cx", x)
 //                    .attr("cy", y)
@@ -240,9 +121,7 @@ fill:#FF0000;
 //                    break;
 //            }
 //        })
-
     });
-
 </script>
 {% endblock %}
 

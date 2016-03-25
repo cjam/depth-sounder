@@ -26,6 +26,20 @@ After running `setup.sh` you should now have an environment that can be used for
 
 The `web.py` is a simple web application built on `Flask` + `Flask-socketio` which will facilitate real time configuration of the underlying neural net processing.
 
+### Web Clients
+
+I've typescript-ified our web clients and placed the code in `/web/clients/`
+
+There are a few pre-reqs to getting this to work:
+
+- Install npm
+- `npm install -g tsd`
+
+In order for typescript to properly compile these, you must run the following command in this directory:
+
+`tsd install`
+
+I'll get around to adding it to the setup scripts.
 
 # Scripts
 

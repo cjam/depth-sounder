@@ -25,10 +25,11 @@
 
         var mixerViewModel = new MixerViewModel(mixerData);
 
+        console.log(mixerViewModel);
         ko.applyBindings(mixerViewModel,$("#MixerView")[0]);
 
-        var deviceMotionAdapter = new DeviceMotionAdapter();
-        ko.applyBindings(deviceMotionAdapter, $("#DeviceInfoView")[0]);
+//        var deviceMotionAdapter = new DeviceMotionAdapter();
+//        ko.applyBindings(deviceMotionAdapter, $("#DeviceInfoView")[0]);
 
     });
 

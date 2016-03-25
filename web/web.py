@@ -32,11 +32,18 @@ def device_motion_updated(device_info):
     print device_info
     # print "Device "+ device_info["id"] +"  moved" + device_info.__str__()
 
-@socketio.on('update_channel')
-def update_channel(channel_json):
-    global mixer
-    ch = Channel(**channel_json)
-    mixer.set_channel_state(ch)
+# @socketio.on('update_channel')
+# def update_channel(channel_json):
+#     global mixer
+#     ch = Channel(**channel_json)
+#     mixer.set_channel_state(ch)
+#     mixer.push()
+
+@socketio.on('update_mixer')
+def mixer_updated(mixer_json):
+    global mixer;
+    print mixer_json
+    mixer.set_state(mixer_json)
     mixer.push()
 
 @socketio.on('start_audio')
