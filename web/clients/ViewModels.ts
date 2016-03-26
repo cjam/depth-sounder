@@ -37,6 +37,7 @@ interface IViewModelOptions<T> {
     autoEmit?:boolean;
     autoUpdate?:boolean;
     mapping?: any;
+    checkId?: boolean
 }
 
 abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,IUnique {
@@ -44,7 +45,12 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
     public data:KnockoutComputed<T>
     public id:KnockoutObservable<number>;
 
-    constructor(data:T, private options:IViewModelOptions<T> = {autoEmit:false,autoUpdate:false,mapping:{}}) {
+    constructor(data:T, private options:IViewModelOptions<T> = {
+        autoEmit: false,
+        autoUpdate: false,
+        mapping: {},
+        checkId: true
+    }) {
         this._isUpdating = false;
         if(!this.options){
             this.options = {};
@@ -63,8 +69,8 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
         if (options.autoUpdate) {
             // subscribe to socket updates
             socket.on(this.modelName() + "_" + "changed", (message:T)=> {
-                // if this update is about us
-                if (this.id() == message.id) {
+                // if we're concerned with id's check to make sure it matches
+                if (!options.checkId || this.id() == message.id) {
                     console.log("Update received from server, updating model", message);
                     this._isUpdating = true;
                     this.apply(message);
@@ -155,6 +161,7 @@ class MixerViewModel extends ViewModelBase<IMixer> implements IMixer {
                     }
                 }
             }
+            , checkId: false
         });
     }
 
