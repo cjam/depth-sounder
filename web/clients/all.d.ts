@@ -4,3 +4,4 @@
 ///<reference path="Visual.ts"/>
 ///<reference path="UI.ts"/>
 ///<reference path="Vector.ts"/>
+///<reference path="SocketManager.ts"/>

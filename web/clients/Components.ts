@@ -1,3 +1,5 @@
+///<reference path="all.d.ts"/>
+
 class FullScreenViewModel {
     private _$target:JQuery;
 

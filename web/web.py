@@ -1,5 +1,7 @@
 import logging
 
+import time
+
 import processing.Config as Config
 from audiolazy.lazy_wav import WavStream
 from flask import Flask, render_template, request
@@ -23,9 +25,8 @@ logging.basicConfig(level=logging.WARN)
 
 global mixer
 mixer = None
-
-push_lock = threading.Lock()
-
+global device_num
+device_num = 0
 
 @app.route('/')
 def index():
@@ -89,8 +90,9 @@ def move(message):
 def on_device_connect():
     logger.info("Device Connected %s", request.sid)
     global mixer
+    global device_num
     id = request.sid
-    ch = Channel(SynthStream(), id=id, name="Client Synth: " + id.__str__(), enabled=True, gain=0.0)
+    ch = Channel(SynthStream(), id=id, name="Device: " + (++device_num).__str__(), enabled=True, gain=0.0)
     mixer.add_channel(ch)
     mixer.push()
     emit("channel_added", ch.as_dict(), namespace="/device")
@@ -112,6 +114,11 @@ def on_device_disconnect():
     id = request.sid
     logger.info("Device Disconnected %s", id)
     mixer.remove_channel(id)
+    # have been running into issues with sockets recursive calls, trying
+    # to sleep so that this socket may be removed from socket io before
+    # we do a push. Only doing it on device disconnect since a delay
+    # here isn't a huge deal
+    time.sleep(0.5)
     mixer.push()
 
 @socketio.on('connect')

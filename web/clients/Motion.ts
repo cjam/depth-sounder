@@ -184,23 +184,24 @@ var swipe_threshold = 1;
 
 
 class DeviceMotionChannel {
-    private io:SocketIOClient.Socket;
+    private socket:SocketIOClient.Socket;
     private viewModel:ChannelViewModel;
     private motion:RxMotion;
 
     constructor() {
         let self = this;
         this.motion = new RxMotion(20);
-        this.io = io("/device");
+        this.socket = SocketManager.GetSocket("/device");
+        ;
 
-        this.io.on("channel_updated", (data)=> {
+        this.socket.on("channel_updated", (data)=> {
             if (self.viewModel) {
                 self.viewModel.apply(data);
                 console.log("Updated view model", self.viewModel);
             }
         })
 
-        this.io.on("channel_added", (data)=> {
+        this.socket.on("channel_added", (data)=> {
             if (!self.viewModel) {
                 self.viewModel = new ChannelViewModel(data, {
                     autoEmit: true,
@@ -229,7 +230,7 @@ class DeviceMotionChannel {
         //})
 
         this.motion.position.subscribe((n)=> {
-            console.log("position", n);
+            //console.log("position", n);
         })
 
         var self = this;

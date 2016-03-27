@@ -64,7 +64,7 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
         }
 
         console.log("Opening socket...");
-        this.socket = io(options.ioNamespace || "/")
+        this.socket = SocketManager.GetSocket(options.ioNamespace || "/");
 
         // Apply the data from the constructor to create observables
         this.apply(data);
