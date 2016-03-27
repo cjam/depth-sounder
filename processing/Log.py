@@ -1,6 +1,6 @@
 import logging
 
-level = logging.WARN
+level = logging.INFO
 
 
 def get_logger(name):
@@ -11,7 +11,7 @@ def get_logger(name):
     handler = logging.StreamHandler()
     handler.setLevel(level)
 
-    handler.setFormatter(logging.Formatter('%(levelname)s::%(name)s\t(%(lineno)d)   %(message)s'))
+    handler.setFormatter(logging.Formatter('%(levelname)s::%(name)s(%(lineno)d) %(message)s'))
 
     logger.addHandler(handler)
     return logger

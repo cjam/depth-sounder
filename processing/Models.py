@@ -197,6 +197,9 @@ class Mixer(ModelBase):
         self.channels = {}
         self._enabled = ControlStream(1.0)
         self._smix = Streamix(zero=0)
+        # add a continuous stream of 0's to prevent our output stream from ending
+        self._smix.add(0, Stream(0))
+        self._outStream = self._smix
         self.__player = None
         super(Mixer, self).__init__(**kwargs)
 
@@ -232,6 +235,14 @@ class Mixer(ModelBase):
                     self.channels[ch.id] = ch
                     self._smix.add(0, ch.channelStream)
 
+    def remove_channel(self, chId):
+        ch = self.channels.get(chId)
+        if ch is not None:
+            with self.__lock:
+                ch.Enabled = False
+                # todo: might need to call finish on channel or something in order to end the stream
+                del self.channels[chId]
+
     def set_state(self, kwargs):
         if kwargs.has_key("isPlaying"):
             self.IsPlaying = kwargs["isPlaying"]
@@ -262,7 +273,8 @@ class Mixer(ModelBase):
         return state
 
     def push(self, include_self=False):
-        emit("mixer_changed", self.as_dict(), broadcast=True, include_self=include_self)
+        mixer_json = self.as_dict()
+        emit("mixer_changed", mixer_json, broadcast=True, include_self=include_self, namespace="/")
 
     def get_stream(self):
-        return self._smix * inertia_filter(self._enabled)
+        return self._outStream

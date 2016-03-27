@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block scripts %}
+{{ super() }}
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="/static/clients/Motion.js"></script>
+{% endblock %}
+
+
+{% block body %}
+<svg id="#visualRoot"></svg>
+<script type="text/javascript">
+    $(document).ready(function () {
+        var deviceMotion = new DeviceMotionChannel();
+    });
+</script>
+
+
+{% endblock %}

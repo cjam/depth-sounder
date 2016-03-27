@@ -263,7 +263,6 @@ class ChannelsVisual extends D3Visual<KnockoutObservableArray<ChannelViewModel>,
 
     }
 
-
 }
 
 class MixerVisual {

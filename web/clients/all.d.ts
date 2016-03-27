@@ -3,3 +3,4 @@
 ///<reference path="knockout-extensions.ts"/>
 ///<reference path="Visual.ts"/>
 ///<reference path="UI.ts"/>
+///<reference path="Vector.ts"/>
