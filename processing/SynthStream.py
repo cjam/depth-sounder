@@ -67,7 +67,7 @@ def memoize(func):
 rate = 44100
 s, Hz = sHz(rate)
 ms = 1e-3 * s
-dur_note = 600 * ms
+dur_note = 1500 * ms
 
 # Frequencies (always in Hz here)
 
@@ -79,9 +79,9 @@ concat = lambda iterables: reduce(operator.concat, iterables, [])
 class SynthStream(Stream):
     def __init__(self):
         # (always in Hz here)
-        self._freq_base = 440
+        self._freq_base = 20
         self._freq_min = 10
-        self._freq_max = 1000
+        self._freq_max = 100
         self._ratios = [1, 3 / 2]  # 2/1 is the next octave
         self.__control_x__ = ControlStream(1);
         self.__control_y__ = ControlStream(1);
@@ -100,14 +100,14 @@ class SynthStream(Stream):
 
         self.freq_range = range(self._freq_min, self._freq_max, 1)
 
-        table = TableLookup(line(100, -1, 1).append(line(100, 1, -1)).take(inf))
+        table = TableLookup(line(200, -2, 1).append(line(50, 1, -2)).take(inf))
 
         super(SynthStream, self).__init__(chain.from_iterable(self.window_gen(table)))
 
     def window_gen(self, synth):
         while True:
             freq = rint((self.__control_x__.value + 1) / 2 * (self._freq_max - self._freq_min) + self._freq_min) * Hz
-            env_asdr = adsr(dur_note, a=20 * ms, d=10 * ms, s=.8, r=(self.__control_y__.value + 1) * 100 * ms) / 1.7
+            env_asdr = adsr(dur_note, a=20 * ms, d=10 * ms, s=.8, r=30 * ms) / 1.7
             yield synth(freq) * list(env_asdr)
 
 
