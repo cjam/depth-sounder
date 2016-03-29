@@ -18,5 +18,8 @@
     "recurrent"
   ],
   "author": "Colter McQuay",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "chai": "^3.5.0"
+  }
 }

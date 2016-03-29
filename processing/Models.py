@@ -69,11 +69,19 @@ class Channel(ModelBase):
         self.name = "channel"
         self._gainControl = ControlStream(1.0)
         self._enabledControl = ControlStream(1)
+        self._stream = stream
+
+        # Control Streams
         self._x = ControlStream(0.0);
         self._y = ControlStream(0.0);
-        self._stream = stream
+        self._gamma = ControlStream(0.0);
+        self._beta = ControlStream(0.0);
+        self._alpha = ControlStream(0.0);
+
         self.inject_control_streams(self._stream)
+
         self.channelStream = self._stream * inertia_filter(self._gainControl) * inertia_filter(self._enabledControl)
+
         # Calling super here will call the base model class
         # and ultimately call set_state
         super(Channel, self).__init__(**kwargs)
@@ -86,10 +94,46 @@ class Channel(ModelBase):
             stream.__control_x__ = self._x
         if self._stream_has_attr("__control_y__"):
             stream.__control_y__ = self._y
+        if self._stream_has_attr("__control_y__"):
+            stream.__control_y__ = self._y
+        if self._stream_has_attr("__control_y__"):
+            stream.__control_y__ = self._y
+        if self._stream_has_attr("__control_y__"):
+            stream.__control_y__ = self._y
             # todo: add in device motion here?
 
     def _stream_has_attr(self, name):
         return name in self._stream.__dict__
+
+    @property
+    def Gamma(self):
+        return self._gamma.value;
+
+    @Gamma.setter
+    def Gamma(self, val):
+        current = self.Gamma
+        if current != val:
+            self._gamma.value = val
+
+    @property
+    def Beta(self):
+        return self._beta.value;
+
+    @Beta.setter
+    def Beta(self, val):
+        current = self.Beta
+        if current != val:
+            self._beta.value = val
+
+    @property
+    def Alpha(self):
+        return self._alpha.value;
+
+    @Gamma.setter
+    def Alpha(self, val):
+        current = self.Alpha
+        if current != val:
+            self._alpha.value = val
 
     @property
     def X(self):
@@ -156,6 +200,15 @@ class Channel(ModelBase):
         if kwargs.has_key("y"):
             self.Y = kwargs["y"]
 
+        if kwargs.has_key("gamma"):
+            self.Gamma = kwargs["gamma"]
+
+        if kwargs.has_key("beta"):
+            self.Beta = kwargs["beta"]
+
+        if kwargs.has_key("alpha"):
+            self.Alpha = kwargs["alpha"]
+
     def as_dict(self):
         state = super(Channel, self).as_dict()
         state["name"] = self.name
@@ -163,6 +216,9 @@ class Channel(ModelBase):
         state["enabled"] = self.Enabled
         state["x"] = self.X
         state["y"] = self.Y
+        state["gamma"] = self.Gamma
+        state["beta"] = self.Beta
+        state["alpha"] = self.Alpha
         return state
 
 

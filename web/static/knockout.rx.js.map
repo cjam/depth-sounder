@@ -3,7 +3,7 @@
   "file": "knockout.rx.js",
   "sourceRoot": "",
   "sources": [
-    "../src/knockout.rx.ts"
+    "knockout.rx.ts"
   ],
   "names": [
     "noop",

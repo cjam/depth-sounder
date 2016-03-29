@@ -2,6 +2,7 @@
 import CompositeDisposable = Rx.CompositeDisposable;
 import IObservable = Rx.IObservable;
 import IDisposable = Rx.IDisposable;
+import Disposable = Rx.Disposable;
 /**
  * Created by cmcquay on 2016-03-17.
  */
@@ -43,10 +44,12 @@ interface IViewModelOptions {
 }
 
 abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,IUnique {
-    protected _isUpdating:boolean;
     public data:KnockoutComputed<T>
+    public dataStream:Rx.Observable<T>;
     public id:KnockoutObservable<number>;
-    private socket:SocketIOClient.Socket;
+    private socket:ISocket;
+    public autoEmit:KnockoutObservable<boolean>;
+    public autoUpdate:KnockoutObservable<boolean>;
 
     constructor(data:T, private options:IViewModelOptions = {
         autoEmit: false,
@@ -55,16 +58,19 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
         checkId: true,
         ioNamespace: "/"
     }) {
-        this._isUpdating = false;
+        let self = this;
+
         if (!this.options) {
             this.options = {};
         }
+
         if (!this.options.mapping) {
             this.options.mapping = {};
         }
 
-        console.log("Opening socket...");
         this.socket = SocketManager.GetSocket(options.ioNamespace || "/");
+        console.log("Opening socket...", this.socket);
+        ;
 
         // Apply the data from the constructor to create observables
         this.apply(data);
@@ -73,22 +79,28 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
             return ko.mapping.toJS(this);
         }, this);
 
-        if (options.autoUpdate) {
-            // subscribe to socket updates
-            this.socket.on(this.modelName() + "_" + "changed", (message:T)=> {
-                // if we're concerned with id's check to make sure it matches
-                if (!options.checkId || this.id() == message.id) {
-                    console.log("Update received from server, updating model", message);
-                    this._isUpdating = true;
-                    this.apply(message);
-                    this._isUpdating = false;
-                }
-            });
-        }
+        this.dataStream = this.data.toObservableWithReplyLatest()
 
-        if (options.autoEmit) {
-            this.data.subscribe(this.emit, this);
-        }
+        // Auto Emit
+        this.autoEmit = ko.observable<boolean>(options.autoEmit || false);
+        var emitStream = this.dataStream.where((d)=>self.autoEmit()).pausable();
+        emitStream.throttle(10).subscribe((d)=> {
+            self.emit();
+        });
+
+        this.autoUpdate = ko.observable<boolean>(options.autoUpdate || false);
+
+        var updateStream = Rx.Observable.fromEvent<T>(this.socket, this.modelName() + "_" + "changed")
+        updateStream.throttle(20).where((d)=>self.autoUpdate()).subscribe((data)=> {
+            if (!options.checkId || this.id() == data.id) {
+                console.debug("_Update received from server", data);
+                emitStream.pause();
+                self.apply(data);
+                emitStream.resume();
+            }
+        });
+
+        emitStream.resume();
     }
 
     abstract modelName():string;
@@ -102,13 +114,12 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
     }
 
     protected emit() {
-        if (!this._isUpdating) {
-            try {
-                var data = this.data();
-                this.socket.emit("update_" + this.modelName().toLowerCase(), data);
-            } catch (Error) {
-                console.log(Error);
-            }
+        try {
+            var data = this.data();
+            //console.debug("Pushing model to server", data);
+            this.socket.emit("update_" + this.modelName().toLowerCase(), data);
+        } catch (Error) {
+            console.error(Error);
         }
     }
 
@@ -129,6 +140,9 @@ interface IChannel extends IUnique {
     name: string|KnockoutObservable<string>;
     x:number|KnockoutObservable<number>;
     y:number|KnockoutObservable<number>;
+    gamma:number|KnockoutObservable<number>;
+    beta:number|KnockoutObservable<number>;
+    alpha:number|KnockoutObservable<number>;
 }
 
 interface IMixer extends IUnique {
@@ -142,6 +156,9 @@ class ChannelViewModel extends ViewModelBase<IChannel> implements IChannel {
     name:KnockoutObservable<string>;
     x:KnockoutObservable<number>;
     y:KnockoutObservable<number>;
+    gamma:KnockoutObservable<number>;
+    beta:KnockoutObservable<number>;
+    alpha:KnockoutObservable<number>;
 
     modelName():string {
         return "channel";
@@ -160,7 +177,6 @@ class MixerViewModel extends ViewModelBase<IMixer> implements IMixer {
             mapping: {
                 'channels': {
                     key: function (data) {
-                        console.log("Channel", data)
                         return ko.utils.unwrapObservable(data.id)
                     }
                     , create: function (options) {

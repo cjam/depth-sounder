@@ -1,18 +1,26 @@
 import logging
-
 import time
+import traceback
 
 import processing.Config as Config
 from audiolazy.lazy_wav import WavStream
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, send
-from processing.Audio import SinStream
 from processing.Log import get_logger
 from processing.Models import Channel, Mixer
 import socket
 import threading
-
 from processing.SynthStream import SynthStream
+
+
+def norecurse(f):
+    def func(*args, **kwargs):
+        if len([l[2] for l in traceback.extract_stack() if l[2] == f.func_name]) > 0:
+            raise Exception, 'Recursed'
+        return f(*args, **kwargs)
+
+    return func
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -27,6 +35,7 @@ global mixer
 mixer = None
 global device_num
 device_num = 0
+
 
 @app.route('/')
 def index():
@@ -50,6 +59,11 @@ def visual():
 def motion():
     global mixer
     return render_template('motion.html', mixer=mixer.as_dict())
+
+
+@app.route('/tests')
+def tests():
+    return render_template('test_runner.html');
 
 
 # @socketio.on('update_channel')
@@ -108,6 +122,12 @@ def on_device_channel_update(channel_state):
         logger.error("Error occured while trying to set channel state", e)
 
 
+@socketio.on_error_default  # handles all namespaces without an explicit error handler
+def default_error_handler(e):
+    logger.error("SocketIO_Error: %s", e.message)
+
+
+@norecurse
 @socketio.on('disconnect', '/device')
 def on_device_disconnect():
     global mixer
@@ -121,16 +141,20 @@ def on_device_disconnect():
     time.sleep(0.5)
     mixer.push()
 
+
 @socketio.on('connect')
 def on_connect():
     global mixer
     logger.info('Client Connected')
-    mixer.push()
+    try:
+        mixer.push()
+    except Exception, e:
+        logger.error(e)
+
 
 @socketio.on('disconnect')
 def on_disconnect():
     print('Client disconnected')
-
 
 if __name__ == '__main__':
     global mixer
@@ -148,7 +172,7 @@ if __name__ == '__main__':
     #     ch.id = i
     #     mixer.add_channel(ch)
 
-    mixer.IsPlaying = True
+    mixer.IsPlaying = False
 
     # Start our Web app
     print "Current IP Addresses:", [l for l in (

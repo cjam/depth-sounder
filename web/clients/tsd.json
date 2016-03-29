@@ -94,6 +94,15 @@
     },
     "hammerjs/hammerjs.d.ts": {
       "commit": "6766ed1d0faf02ede9e2edf2e66bbb2388c825ec"
+    },
+    "mocha/mocha.d.ts": {
+      "commit": "299b5caa22876ef27dc8e9a5b7fd7bf93457b6f4"
+    },
+    "assertion-error/assertion-error.d.ts": {
+      "commit": "299b5caa22876ef27dc8e9a5b7fd7bf93457b6f4"
+    },
+    "chai/chai.d.ts": {
+      "commit": "299b5caa22876ef27dc8e9a5b7fd7bf93457b6f4"
     }
   }
 }

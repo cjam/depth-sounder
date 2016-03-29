@@ -30,48 +30,51 @@ interface ITimestamp<T> {
 }
 
 class IntegratingObservable extends Rx.Observable implements Rx.IObservable<Vector> {
-    subscribe(observer:Rx.Observer<Vector>):Rx.IDisposable {
+    public subscribe(observer:Rx.Observer<Vector>):Rx.IDisposable {
         return this.integration.subscribe(observer);
     }
 
-    subscribe(onNext?:(value:Vector)=>void, onError?:(exception:any)=>void, onCompleted?:()=>void):Rx.IDisposable {
+    public subscribe(onNext?:(value:Vector)=>void, onError?:(exception:any)=>void, onCompleted?:()=>void):Rx.IDisposable {
         return this.integration.subscribe(onNext, onError, onCompleted);
     }
 
-    subscribeOnNext(onNext:(value:Vector)=>void, thisArg?:any):Rx.IDisposable {
+    public subscribeOnNext(onNext:(value:Vector)=>void, thisArg?:any):Rx.IDisposable {
         return this.integration.subscribeOnNext(onNext, thisArg);
     }
 
-    subscribeOnError(onError:(exception:any)=>void, thisArg?:any):Rx.IDisposable {
+    public subscribeOnError(onError:(exception:any)=>void, thisArg?:any):Rx.IDisposable {
         return this.subscribeOnError(onError, thisArg);
     }
 
-    subscribeOnCompleted(onCompleted:()=>void, thisArg?:any):Rx.IDisposable {
+    public subscribeOnCompleted(onCompleted:()=>void, thisArg?:any):Rx.IDisposable {
         return this.subscribeOnCompleted(onCompleted, thisArg);
     }
 
     private integratedValue:Vector;
-    private source:IObservable<Vector>;
+    private integration:Rx.Observable<Vector>;
 
-    private integration:IObservable<Vector>;
-
-    constructor(source:Rx.Observable<Vector>) {
+    constructor(private source:Rx.Observable<Vector> | IntegratingObservable, scheduler?:Rx.IScheduler) {
         super()
         // initial seed
+        let self = this;
         this.integratedValue = new Vector();
-        this.integration = source.timestamp()
+        this.integration = (<Rx.Observable<Vector>>this.source).timestamp(scheduler)
             .bufferWithCount(2, 1)       // take two samples hopping 1 sample every time
             .select(v_buf=> {
                 let v1 = v_buf[0];  // accel 1
                 let v2 = v_buf[1];  // accel 2
-                let dt = (v2.timestamp - v1.timestamp) / 1000;  // delta time (seconds)
-                // take difference of vectors and multiply by the delta time
-                let integrated_vec = v2.value.subtract(v1.value).multiply(dt);
-                return integrated_vec
+                if (v1 != undefined && v2 != undefined) {
+                    let dt = (v2.timestamp - v1.timestamp) / 1000;  // delta time (seconds)
+                    // take the average of the two vectors and multiply by the time in between
+                    let integrated_vec = v2.value.add(v1.value).divide(2.0).multiply(dt);
+                    return integrated_vec
+                } else {
+                    return new Vector();
+                }
             })
             .scan((vel, integrated)=> {
-                this.integratedValue = this.integratedValue.add(integrated)
-                return this.integratedValue
+                self.integratedValue = self.integratedValue.add(integrated)
+                return self.integratedValue
             }, this.integratedValue)
     }
 
@@ -82,14 +85,18 @@ class IntegratingObservable extends Rx.Observable implements Rx.IObservable<Vect
     }
 }
 
-//Rx.Observable.Integrate = function() : IntegratingObservable{
-//    var source : Rx.Observable<Vector> = this;
-//    return new IntegratingObservable(source);
-//}
+Rx.Observable.Integrate = function ():IntegratingObservable {
+    var source:Rx.Observable<Vector> = this;
+    return new IntegratingObservable(source);
+}
 
 // todo: translate the classes below to typescript
 
 class RxMotion {
+    private accel_threshold:Vector = new Vector(0.2, 0.2, 0.2);
+    private vel_threshold:Vector = new Vector(0.2, 0.2, 0.2);
+    private pos_threshold:Vector = new Vector(0.5, 0.5, 0.5);
+
     public isSupported:KnockoutObservable<boolean>
     public samplingInterval:KnockoutObservable<number>
 
@@ -102,8 +109,14 @@ class RxMotion {
     public acceleration:Rx.Observable<Vector>
     public accelerationIncludingGravity:Rx.Observable<Vector>
     public rotationRate:Rx.Observable<number>
+
+    public averageAcceleration:Rx.Observable<Vector>;
+
+    // Calculated integrals
     public velocity:IntegratingObservable;
+    public averageVelocity:Rx.Observable<Vector>;
     public position:IntegratingObservable;
+    public averagePosition:Rx.Observable<Vector>;
 
     // Device Orientation
     public orientation:Rx.Observable<IDeviceOrientation>;
@@ -132,12 +145,19 @@ class RxMotion {
 
         // Device Motion
         this.motion = this._motionSubject.asObservable();
+
         this.acceleration = this.motion.pluck<IVector>("acceleration").select(Vector.fromData);
-        this.accelerationIncludingGravity = this.motion.pluck<IVector>("accelerationIncludingGravity").select(Vector.fromData);
+        this.averageAcceleration = RxMotion.vectorAverage(this.acceleration, 100, this.accel_threshold);
+
+        this.accelerationIncludingGravity = RxMotion.vectorAverage(this.motion.pluck<IVector>("accelerationIncludingGravity").select(Vector.fromData), 100, this.accel_threshold);
+        ;
         this.rotationRate = this.motion.pluck<number>("rotationRate");
 
-        this.velocity = new IntegratingObservable(this.acceleration);
+        this.velocity = new IntegratingObservable(this.averageAcceleration)
+        this.averageVelocity = RxMotion.vectorAverage(this.velocity, 100, this.vel_threshold);
+
         this.position = new IntegratingObservable(this.velocity);
+        this.averagePosition = RxMotion.vectorAverage(this.position, 100, this.pos_threshold);
 
         // Device Orientation
         this.orientation = this._orientationSubject.asObservable();
@@ -156,8 +176,21 @@ class RxMotion {
 
         // Set the sampling interval to initialize things
         this.samplingInterval(samplingInterval || 100);
-        ;
+    }
 
+    public static vectorAverage<Vector>(source:Rx.Observable<Vector>, numSamples:number = 100, threshold:Vector = new Vector()):Rx.Observable<Vector> {
+        return source.bufferWithCount(numSamples, 1)
+            .select((samples:Vector[])=> {
+                var temp = new Vector();
+                samples.forEach((s)=> {
+                    temp = temp.add(s);
+                })
+                temp = temp.divide(samples.length)
+                temp.x = Math.abs(temp.x) < threshold.x ? 0 : temp.x;
+                temp.y = Math.abs(temp.y) < threshold.y ? 0 : temp.y;
+                temp.z = Math.abs(temp.z) < threshold.z ? 0 : temp.z;
+                return temp;
+            });
     }
 
     private handleSampleIntervalChanged(newInterval) {
@@ -181,18 +214,26 @@ var GravityScale = d3.scale.linear().domain([-9, 9]);
 var GammaScale = d3.scale.linear().domain([-1, 1]);
 var Gravity_To_Volume = GravityScale.range([0, 4]).clamp(true);
 var swipe_threshold = 1;
-
+var CompassScale = d3.scale.linear().domain([-90, 0, 90]);
+var Compass_To_Volume = CompassScale.range([4, 0, 4]).clamp(true);
+var Compass_To_X = CompassScale.range([-1, 0, 1]).clamp(true);
 
 class DeviceMotionChannel {
     private socket:SocketIOClient.Socket;
     private viewModel:ChannelViewModel;
     private motion:RxMotion;
 
+    public acceleration:KnockoutObservable<Vector>;
+    public velocity:KnockoutObservable<Vector>;
+    public position:KnockoutObservable<Vector>;
+
+    public initialCompassHeading:number;
+
     constructor() {
         let self = this;
-        this.motion = new RxMotion(20);
+        this.motion = new RxMotion(10);
         this.socket = SocketManager.GetSocket("/device");
-        ;
+        this.initialCompassHeading = 0;
 
         this.socket.on("channel_updated", (data)=> {
             if (self.viewModel) {
@@ -214,14 +255,34 @@ class DeviceMotionChannel {
         })
     }
 
-    private MovingAverage<T>(source:IObservable<T>, numSamples) {
-        // todo: this would be great
-    }
-
     private hookupMotion() {
-        this.motion.accelerationIncludingGravity.select(a=> {
-            return Gravity_To_Volume(a.z);
-        }).subscribe(this.viewModel.gain)
+        let self = this;
+
+        // store the first compass heading
+        this.motion.compassHeading.first().subscribe((d)=> {
+            this.initialCompassHeading = d;
+        })
+
+        this.motion.compassHeading.select((d)=> {
+            let normalized = d - self.initialCompassHeading;
+            if (normalized < 0) {
+                normalized += 360;
+            }
+            // just some normalization to put it into a
+            // continuous domain (i.e. 90 -> 90)
+            normalized -= normalized > 180 ? 360 : 0;
+            return Compass_To_X(normalized);
+        }).subscribe(this.viewModel.x);
+
+        //this.motion.averagePosition
+        //    .select(v=>v.x)
+        //    .do((x)=>console.log("x",x))
+        //    .where(vx=>vx>10)
+        //    .take(1)
+        //    .subscribe((n)=>{
+        //        console.log("yep",n);
+        //    })
+
 
         //this.motion.velocity.where(vel=> {
         //    return Math.abs(vel.length()) > 1;
@@ -229,15 +290,19 @@ class DeviceMotionChannel {
         //    console.log("Swiped " + (n > 0) ? "Left" : "Right");
         //})
 
-        this.motion.position.subscribe((n)=> {
-            //console.log("position", n);
-        })
+        //this.motion.velocity.subscribe((n)=>{
+        //    console.clear()
+        //    console.log("velocity",n);
+        //})
 
-        var self = this;
-        setTimeout(function () {
-            self.motion.position.reset()
-        }, 4000)
+        //this.motion.position.subscribe((n)=> {
+        //    console.log("position", n);
+        //})
 
+        // Wire up rotations
+        this.motion.gamma.select(Math.round).subscribe(this.viewModel.gamma);
+        this.motion.alpha.select(Math.round).subscribe(this.viewModel.alpha);
+        this.motion.beta.select(Math.round).subscribe(this.viewModel.beta);
     }
 
 }

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="static/tests/lib/browser/mocha.css"/>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+
+<!-- Test Framework -->
+<script src="/static/tests/lib/mocha.js"></script>
+<script src="/static/tests/lib/chai.js"></script>
+<script>
+    mocha.setup('bdd')
+    expect = chai.expect;
+    should = chai.should;
+</script>
+<script src="/static/clients/test/tests.js"></script>
+{% endblock %}
+{% block body %}
+
+<script>
+    $(function () {
+
+        mocha.run();
+        // runner.globals(['foo', 'bar', 'baz']);
+
+        // runner.on('test end', function(test){
+        //   console.log(test.fullTitle());
+        // });
+    });
+</script>
+<div id="mocha"></div>
+{% endblock %}
+

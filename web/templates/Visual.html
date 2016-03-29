@@ -9,9 +9,9 @@
 
 {% block page_style %}
 body {
-    margin: 0;
-    overflow:hidden;
-    background: #222;
+margin: 0;
+overflow:hidden;
+background: #222;
 }
 
 #visualRoot {
@@ -32,36 +32,33 @@ body {
 circle {
     fill: transparent;
     stroke-width: 2.5px;
-    stroke:#550000;
+stroke:#AAAAAA;
     opacity:1;
 }
-
-<!--circle.channel{-->
-    <!--opacity:1.0;-->
-<!--}-->
-
 
 
 {% endblock %}
 
 {% block body %}
-<svg id="visualRoot" class="no-select" ></svg>
+<svg id="visualRoot" class="no-select"></svg>
 <div id="controls" class="no-select">
     <fullscreen-button params='target:"#visualRoot"'/>
 </div>
 <script type="text/javascript" src="/static/clients/Visual.js"></script>
 <script type="text/javascript">
-    $(document).ready(function(){
+    $(document).ready(function () {
 
         // prevent the default ios behavior
         document.ontouchmove = function (event) {
             event.preventDefault();
         }
 
-        // Note this will block until the server has rendered the json
-        var mixerViewModel = new MixerViewModel({{ mixer | tojson | safe }})
+//         Note this will block until the server has rendered the json
+//        var mixerViewModel = new MixerViewModel({{ mixer | tojson | safe }})
+//        mixerViewModel.autoEmit(false);
+//        var view = new MixerVisual({svgId:"visualRoot"},mixerViewModel);
 
-        var view = new MixerVisual({svgId:"visualRoot"},mixerViewModel);
+        var view = new DepthSounderVisual({svgId: "visualRoot"});
 
 
 //        var hammerOptions = {};

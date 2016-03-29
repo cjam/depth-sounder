@@ -52,3 +52,11 @@ ko.components.register("fullscreen-button", {
         class="btn-danger btn-lg">Full Screen\
     </button>'
 });
+
+
+//ko.components.register("socket-status",{
+//    viewModel: (params)=> {
+//        return SocketManager
+//    },
+//    template: '<span data-bind="style: { color: isConnected() ? \'green\' : \'red\'>Socket Status</span>'
+//}
