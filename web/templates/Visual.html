@@ -9,9 +9,9 @@
 
 {% block page_style %}
 body {
-margin: 0;
-overflow:hidden;
-background: #222;
+    margin: 0;
+    overflow:hidden;
+    background: #222;
 }
 
 #visualRoot {
@@ -32,7 +32,7 @@ background: #222;
 circle {
     fill: transparent;
     stroke-width: 2.5px;
-stroke:#AAAAAA;
+    stroke:#AAAAAA;
     opacity:1;
 }
 
@@ -60,7 +60,7 @@ stroke:#AAAAAA;
 
         var view = new DepthSounderVisual({svgId: "visualRoot"});
 
-
+        ko.applyBindings();
 //        var hammerOptions = {};
 //
 //        var visual = $("#visualRoot")

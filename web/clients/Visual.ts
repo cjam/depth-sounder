@@ -56,6 +56,24 @@ interface D3ViewOptions {
     svgId:string;
 }
 
+
+class Domains {
+    static Gravity = d3.scale.linear().domain([-9, 9]);
+    static Compass = d3.scale.linear().domain([-90, 0, 90]);
+    // static Gamma = d3.scale.linear().domain([-90, 0, 90]);
+    // static Alpha = d3.scale.linear().domain([-90, 0, 90]);
+    // static Beta = d3.scale.linear().domain([-90, 0, 90]);
+    // static Compass = d3.scale.linear().domain([-90, 0, 90]);
+}
+
+class Scales {
+    static Gravity_To_Gain = Domains.Gravity.range([0, 4]).clamp(true);
+
+    static Compass_To_Gain = Domains.Compass.range([4, 0, 4]).clamp(true);
+    static Compass_To_X = Domains.Compass.range([-1, 0, 1]).clamp(true);
+}
+
+
 abstract class D3Viz<T> {
     private _rootId:string
     protected $root:JQuery
@@ -142,7 +160,6 @@ abstract class D3Viz<T> {
     protected abstract updateVisualization(svg:d3.Selection<any>, data:T);
 }
 
-
 class DepthSounderVisual extends D3Viz<IMixer> {
 
     private socket:ISocket;
@@ -174,23 +191,27 @@ class DepthSounderVisual extends D3Viz<IMixer> {
         var channelData = <IChannel[]>data.channels;
         var numChannels = channelData.length;
 
+        console.log("data updated", data);
 
         function razzleDazzle() {
             let curCircle = d3.select(this);
-            var x = d3.select(this).attr("cx");
-            var y = d3.select(this).attr("cy");
+            var x = curCircle.attr("cx");
+            var y = curCircle.attr("cy");
             self.svg.insert("circle")
                 .attr("class", "ghost")
-                .attr("cx", curCircle.attr("cx"))
-                .attr("cy", curCircle.attr("cy"))
+                .attr("cx", x)
+                .attr("cy", y)
+                .attr("r", 1e-6)
+                .style("stroke", curCircle.style("stroke"))
+                .style("opacity", 0.7)
                 .attr("r", curCircle.attr("r"))
-                .style("stroke", d3.hsl((self.i = (self.i + 1) % 360), 1, .5))
-                .style("stroke-opacity", 1)
                 .transition()
                 .duration(2000)
                 .ease(Math.sqrt)
-                .attr("r", 1e-6)
-                .style("stroke-opacity", 1e-6)
+                .attr("r", 1)
+                .attr("cy", 0)
+                .style("stroke-opacity", 0.2)
+                .style("stroke", "#000000")
                 .remove();
         }
 
@@ -206,21 +227,26 @@ class DepthSounderVisual extends D3Viz<IMixer> {
         svg.selectAll("circle.channel").transition()
             .duration(100)
             .attr("r", (ch)=> {
-                return ch.gain * 10 + 50;
+                return ch.gain * 20 + 20;
             })
             .attr("cx", (ch)=> {
                 return this.xScale.invert(ch.x);
             })
             .attr("cy", (ch)=> {
-                return this.yScale.invert(ch.y);
+                return self.$svg.height()
+                //return this.yScale.invert(ch.y);
             }).each(razzleDazzle);
 
 
         // ENTER
         channel.enter()
             .append("circle")
+            .attr("class", "channel")
             .attr("id", (d)=> {
                 return d.id;
+            })
+            .style("stroke", (d)=> {
+                return d.color;
             })
             .attr("cy", -100)
             .attr("cx", this.$svg.width() / 2)
@@ -229,7 +255,6 @@ class DepthSounderVisual extends D3Viz<IMixer> {
             .duration(2000)
             .attr("opacity", 0.7)
             .attr("cy", this.$svg.height() / 2)
-            .attr("class", "channel");
 
 
         //var channels = svg.select("circle.channel");
@@ -255,7 +280,109 @@ class DepthSounderVisual extends D3Viz<IMixer> {
         //
         //channel.call(drag);
     }
+}
 
+class DeviceMotionVisual extends D3Viz<IChannel> {
+    private socket:ISocket;
+    public viewModel:ChannelViewModel;
+    public motion:RxMotion;
+
+    public acceleration:KnockoutObservable<Vector>;
+    public velocity:KnockoutObservable<Vector>;
+    public position:KnockoutObservable<Vector>;
+
+    public initialCompassHeading:number;
+
+    constructor(options:D3ViewOptions) {
+        super(options);
+        let self = this;
+        this.motion = new RxMotion(10);
+        this.socket = SocketManager.GetSocket("/device");
+        this.initialCompassHeading = 0;
+
+        this.socket.on("channel_updated", (data)=> {
+            if (self.viewModel) {
+                self.viewModel.apply(data);
+                console.log("Updated view model", self.viewModel);
+            }
+        });
+
+        this.socket.on("channel_added", (data)=> {
+            if (!self.viewModel) {
+                self.viewModel = new ChannelViewModel(data, {
+                    autoEmit: true,
+                    autoUpdate: false,
+                    ioNamespace: "/device"
+                });
+                console.log("Created view model", self.viewModel)
+
+                self.viewModel.dataStream.subscribe((d)=> {
+                    self.update(d);
+                });
+
+                self.svg.style("opacity", 0)
+                    .transition()
+                    .duration(2000)
+                    .ease(Math.sqrt)
+                    .style("background", data.color)
+                    .style("opacity", 1);
+
+                self.hookupMotion();
+                self.update(data);
+            }
+        });
+    }
+
+    public initialize() {
+        // store the first compass heading so we can normalize
+        this.motion.compassHeading.first().subscribe((d)=> {
+            this.initialCompassHeading = d;
+        })
+
+    }
+
+    private hookupMotion() {
+        let self = this;
+        this.initialize();
+        this.motion.accelerationIncludingGravity
+            .select(a=> a.z)
+            .select(Scales.Gravity_To_Gain)
+            .subscribe(this.viewModel.gain)
+
+        this.motion.compassHeading.select((d)=> {
+            let normalized = d - self.initialCompassHeading;
+            if (normalized < 0) {
+                normalized += 360;
+            }
+            // just some normalization to put it into a
+            // continuous domain (i.e. 90 -> 90)
+            normalized -= normalized > 180 ? 360 : 0;
+            return normalized
+        }).select((c)=>Scales.Compass_To_X(c))
+            .subscribe(this.viewModel.x);
+
+        // Wire up rotations
+        this.motion.gamma.select(Math.round).subscribe(this.viewModel.gamma);
+        this.motion.alpha.select(Math.round).subscribe(this.viewModel.alpha);
+        this.motion.beta.select(Math.round).subscribe(this.viewModel.beta);
+
+        //.do((d)=>console.log(d))
+    }
+
+    protected updateVisualization(svg:d3.Selection<any>, data:IChannel) {
+        if (!this.motion.isSupported()) {
+            svg.append("text")
+                .attr("x", this.$svg.width() / 2)
+                .attr("y", this.$svg.height() / 2)
+                .attr("font-size", "20px")
+                .attr("fill", "white")
+                .text("Your browser doesn't support motion :(")
+        } else {
+
+
+        }
+
+    }
 
 }
 

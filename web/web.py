@@ -1,15 +1,11 @@
 import logging
 import time
 import traceback
-
-import processing.Config as Config
-from audiolazy.lazy_wav import WavStream
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, send
 from processing.Log import get_logger
 from processing.Models import Channel, Mixer
 import socket
-import threading
 from processing.SynthStream import SynthStream
 
 
@@ -66,50 +62,21 @@ def tests():
     return render_template('test_runner.html');
 
 
-# @socketio.on('update_channel')
-# def update_channel(channel_json):
-#     global mixer
-#     ch = Channel(**channel_json)
-#     mixer.set_channel_state(ch)
-#     mixer.push()
+# SOCKET IO
 
-@socketio.on('update_mixer')
-def mixer_updated(mixer_json):
-    global mixer;
-    logger.debug("Mixer JSON: %s", mixer_json)
-    mixer.set_state(mixer_json)
-    mixer.push()
+@socketio.on_error_default  # handles all namespaces without an explicit error handler
+def default_error_handler(e):
+    logger.error("SocketIO_Error: %s", e.message)
 
 
-@socketio.on('start_audio')
-def start_audio(message):
+# MODELS
+
+@socketio.on('update_channel')
+def update_channel(ch_json):
     global mixer
-    mixer.IsPlaying = True
+    ch = mixer.get_channel(ch_json)
+    ch.set_state(ch_json)
     mixer.push()
-
-
-@socketio.on('stop_audio')
-def stop_audio(message):
-    global mixer
-    mixer.IsPlaying = False
-    mixer.push()
-
-
-@socketio.on('move')
-def move(message):
-    emit("moved", message, broadcast=True, include_self=False)
-
-
-@socketio.on('connect', '/device')
-def on_device_connect():
-    logger.info("Device Connected %s", request.sid)
-    global mixer
-    global device_num
-    id = request.sid
-    ch = Channel(SynthStream(), id=id, name="Device: " + (++device_num).__str__(), enabled=True, gain=0.0)
-    mixer.add_channel(ch)
-    mixer.push()
-    emit("channel_added", ch.as_dict(), namespace="/device")
 
 
 @socketio.on('update_channel', '/device')
@@ -122,9 +89,40 @@ def on_device_channel_update(channel_state):
         logger.error("Error occured while trying to set channel state", e)
 
 
-@socketio.on_error_default  # handles all namespaces without an explicit error handler
-def default_error_handler(e):
-    logger.error("SocketIO_Error: %s", e.message)
+@socketio.on('update_mixer')
+def mixer_updated(mixer_json):
+    global mixer;
+    logger.debug("Mixer JSON: %s", mixer_json)
+    mixer.set_state(mixer_json)
+    mixer.push()
+
+
+# CONTROLS
+@socketio.on('start_audio')
+def start_audio(message):
+    global mixer
+    mixer.IsPlaying = True
+    mixer.push()
+
+@socketio.on('stop_audio')
+def stop_audio(message):
+    global mixer
+    mixer.IsPlaying = False
+    mixer.push()
+
+
+# CONNECTIONS
+
+@socketio.on('connect', '/device')
+def on_device_connect():
+    logger.info("Device Connected %s", request.sid)
+    global mixer
+    global device_num
+    id = request.sid
+    ch = Channel(SynthStream(), id=id, name="Device: " + (++device_num).__str__(), enabled=True, gain=0.0)
+    mixer.add_channel(ch)
+    mixer.push()
+    emit("channel_added", ch.as_dict(), namespace="/device")
 
 
 @norecurse
@@ -145,6 +143,7 @@ def on_device_disconnect():
 @socketio.on('connect')
 def on_connect():
     global mixer
+    print("Client Connected:  " + request.sid.__str__())
     logger.info('Client Connected')
     try:
         mixer.push()
@@ -154,23 +153,26 @@ def on_connect():
 
 @socketio.on('disconnect')
 def on_disconnect():
-    print('Client disconnected')
+    print("Client Connected:  " + request.sid.__str__())
 
 if __name__ == '__main__':
     global mixer
     mixer = Mixer()
-    # channels = [
-    #     Channel(SynthStream(), name="Synth wave", x=0.2, enabled=False)
-    #     , Channel(SynthStream(), name="Synth wave", x=0.3, enabled=False)
-    #     # , Channel(SynthStream(), name="Synth wave", x=0.1)
-    #     # ,Channel(WavStream(Config.SongDir + "amy_winehouse/02 - You Know I'm No Good.wav"),name="I'm no good", enabled=False)
-    #     # ,Channel(WavStream(Config.SongDir + "amy_winehouse/05 - Back To Black.wav"),name="Back to Black", enabled=False)
-    # ]
+    channels = [
+        # Channel(SynthStream(), name="Synth wave 1", x=0.2, enabled=True)
+        # , Channel(SynthStream(), name="Synth wave 2", x=0.7, enabled=True)
+        # , Channel(SynthStream(), name="Synth wave 3", x=0.1)
+        # ,Channel(WavStream(Config.SongDir + "amy_winehouse/02 - You Know I'm No Good.wav"),name="I'm no good", enabled=True)
+        # ,Channel(WavStream(Config.SongDir + "amy_winehouse/05 - Back To Black.wav"),name="Back to Black", enabled=False)
+    ]
 
     # give each channel an id
-    # for i, ch in enumerate(channels):
-    #     ch.id = i
-    #     mixer.add_channel(ch)
+    for ch in channels:
+        global device_num
+        device_num += 1
+        ch.id = device_num
+        print("adding " + ch.id.__str__())
+        mixer.add_channel(ch)
 
     mixer.IsPlaying = False
 

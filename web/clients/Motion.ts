@@ -1,6 +1,6 @@
 ///<reference path="all.d.ts"/>
 
-// Motion
+// DEVICE MOTION
 
 import Observable = Rx.Observable;
 interface IRotation {
@@ -17,6 +17,8 @@ interface IDeviceMotion {
     timestamp: number;
 }
 
+// DEVICE ORIENTATION
+
 interface IDeviceOrientation {
     rotationRate : IRotation;
     compassHeading: number;
@@ -24,10 +26,7 @@ interface IDeviceOrientation {
     timestamp: number;
 }
 
-interface ITimestamp<T> {
-    timestamp:number;
-    value:T;
-}
+// EXTENSIONS
 
 class IntegratingObservable extends Rx.Observable implements Rx.IObservable<Vector> {
     public subscribe(observer:Rx.Observer<Vector>):Rx.IDisposable {
@@ -43,11 +42,11 @@ class IntegratingObservable extends Rx.Observable implements Rx.IObservable<Vect
     }
 
     public subscribeOnError(onError:(exception:any)=>void, thisArg?:any):Rx.IDisposable {
-        return this.subscribeOnError(onError, thisArg);
+        return this.integration.subscribeOnError(onError, thisArg);
     }
 
     public subscribeOnCompleted(onCompleted:()=>void, thisArg?:any):Rx.IDisposable {
-        return this.subscribeOnCompleted(onCompleted, thisArg);
+        return this.integration.subscribeOnCompleted(onCompleted, thisArg);
     }
 
     private integratedValue:Vector;
@@ -90,8 +89,8 @@ Rx.Observable.Integrate = function ():IntegratingObservable {
     return new IntegratingObservable(source);
 }
 
-// todo: translate the classes below to typescript
 
+/// RxMotion wrapper class for motion api
 class RxMotion {
     private accel_threshold:Vector = new Vector(0.2, 0.2, 0.2);
     private vel_threshold:Vector = new Vector(0.2, 0.2, 0.2);
@@ -210,242 +209,8 @@ class RxMotion {
     }
 }
 
-var GravityScale = d3.scale.linear().domain([-9, 9]);
-var GammaScale = d3.scale.linear().domain([-1, 1]);
-var Gravity_To_Volume = GravityScale.range([0, 4]).clamp(true);
-var swipe_threshold = 1;
-var CompassScale = d3.scale.linear().domain([-90, 0, 90]);
-var Compass_To_Volume = CompassScale.range([4, 0, 4]).clamp(true);
-var Compass_To_X = CompassScale.range([-1, 0, 1]).clamp(true);
-
-class DeviceMotionChannel {
-    private socket:SocketIOClient.Socket;
-    private viewModel:ChannelViewModel;
-    private motion:RxMotion;
-
-    public acceleration:KnockoutObservable<Vector>;
-    public velocity:KnockoutObservable<Vector>;
-    public position:KnockoutObservable<Vector>;
-
-    public initialCompassHeading:number;
-
-    constructor() {
-        let self = this;
-        this.motion = new RxMotion(10);
-        this.socket = SocketManager.GetSocket("/device");
-        this.initialCompassHeading = 0;
-
-        this.socket.on("channel_updated", (data)=> {
-            if (self.viewModel) {
-                self.viewModel.apply(data);
-                console.log("Updated view model", self.viewModel);
-            }
-        })
-
-        this.socket.on("channel_added", (data)=> {
-            if (!self.viewModel) {
-                self.viewModel = new ChannelViewModel(data, {
-                    autoEmit: true,
-                    autoUpdate: false,
-                    ioNamespace: "/device"
-                });
-                self.hookupMotion();
-                console.log("Created view model", self.viewModel)
-            }
-        })
-    }
-
-    private hookupMotion() {
-        let self = this;
-
-        // store the first compass heading
-        this.motion.compassHeading.first().subscribe((d)=> {
-            this.initialCompassHeading = d;
-        })
-
-        this.motion.compassHeading.select((d)=> {
-            let normalized = d - self.initialCompassHeading;
-            if (normalized < 0) {
-                normalized += 360;
-            }
-            // just some normalization to put it into a
-            // continuous domain (i.e. 90 -> 90)
-            normalized -= normalized > 180 ? 360 : 0;
-            return Compass_To_X(normalized);
-        }).subscribe(this.viewModel.x);
-
-        //this.motion.averagePosition
-        //    .select(v=>v.x)
-        //    .do((x)=>console.log("x",x))
-        //    .where(vx=>vx>10)
-        //    .take(1)
-        //    .subscribe((n)=>{
-        //        console.log("yep",n);
-        //    })
 
 
-        //this.motion.velocity.where(vel=> {
-        //    return Math.abs(vel.length()) > 1;
-        //}).subscribe(n=> {
-        //    console.log("Swiped " + (n > 0) ? "Left" : "Right");
-        //})
 
-        //this.motion.velocity.subscribe((n)=>{
-        //    console.clear()
-        //    console.log("velocity",n);
-        //})
 
-        //this.motion.position.subscribe((n)=> {
-        //    console.log("position", n);
-        //})
-
-        // Wire up rotations
-        this.motion.gamma.select(Math.round).subscribe(this.viewModel.gamma);
-        this.motion.alpha.select(Math.round).subscribe(this.viewModel.alpha);
-        this.motion.beta.select(Math.round).subscribe(this.viewModel.beta);
-    }
-
-}
-
-//
-//function ObservableMotion() {
-//    var self = this;
-//
-//    var motionSchema = {
-//        acceleration: {x: 0.0, y: 0.0, z: 0.0},
-//        accelerationIncludingGravity: {x: 0.0, y: 0.0, z: 0.0},
-//        rotationRate: {gamma: 0.0, alpha: 0.0, beta: 0.0},
-//        interval: 0.0,
-//        timestamp: 0
-//    }
-//
-//    self.apply = function (event) {
-//        var motionObj = {
-//            acceleration: event.acceleration,
-//            accelerationIncludingGravity: event.accelerationIncludingGravity,
-//            rotationRate: event.rotationRate,
-//            interval: event.interval,
-//            timestamp: event.timestamp
-//        }
-//
-//        ko.mapping.fromJS(motionObj, {}, self);
-//    }
-//
-//    self.apply(motionSchema);
-//
-//    // Computed properties
-//
-//    var throttleMs = 100;
-//
-//    var _lastAccel = {x: 0.0, y: 0.0, z: 0.0};
-//    var _velocity = {x: 0.0, y: 0.0, z: 0.0};
-//    this.velocity = {
-//        x: ko.computed(function () {
-//            // ( Ax(t) - Ax(t-1) ) / 2 * interval = delta_acceleration
-//            var current = self.acceleration.x();
-//            var last = _lastAccel.x;
-//            _lastAccel.x = current;
-//            _velocity.x = _velocity.x + (current - last) / 2.0 * self.interval();
-//            return _velocity.x;
-//        }).extend({rateLimit: throttleMs}),
-//        y: ko.computed(function () {
-//            var current = self.acceleration.y();
-//            var last = _lastAccel.y;
-//            _lastAccel.y = current;
-//            return (current - last) / 2.0 * self.interval();
-//        }).extend({rateLimit: throttleMs}),
-//        z: ko.computed(function () {
-//            var current = self.acceleration.z();
-//            var last = _lastAccel.z;
-//            _lastAccel.z = current;
-//            return (current - last) / 2.0 * self.interval();
-//        }).extend({rateLimit: throttleMs})
-//    }
-//
-//
-//    var _lastVelocity = {x: 0.0, y: 0.0, z: 0.0};
-//    var _position = {x: 0.0, y: 0.0, z: 0.0};
-//    this.position = {
-//        x: ko.computed(function () {
-//            // ( Ax(t) - Ax(t-1) ) / 2 * interval = delta_acceleration
-//            var current = self.velocity.x();
-//            var last = _lastVelocity.x;
-//            _lastVelocity.x = current;
-//            _position.x = _position.x + (current - last) / 2.0 * self.interval();
-//            return _position.x;
-//        }).extend({rateLimit: throttleMs}),
-//        y: ko.computed(function () {
-//            var current = self.velocity.y();
-//            var last = _lastVelocity.y;
-//            _lastVelocity.y = current;
-//            return (current - last) / 2.0 * self.interval();
-//        }).extend({rateLimit: throttleMs}),
-//        z: ko.computed(function () {
-//            var current = self.velocity.z();
-//            var last = _lastVelocity.z;
-//            _lastVelocity.z = current;
-//            return (current - last) / 2.0 * self.interval();
-//        }).extend({rateLimit: throttleMs})
-//    }
-//}
-//
-//function DeviceMotionAdapter(updateInterval) {
-//    var self = this;
-//
-//    this.isSupported = new ko.observable(false);
-//    this.isTracking = new ko.observable(false);
-//    this.motion = new ObservableMotion();
-//
-//
-//    // Check if mobile
-//    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && window.DeviceOrientationEvent) {
-//        this.isSupported(true);
-//    }
-//
-//    var deviceInfo = {
-//        motion: {},
-//        orientation: {}
-//    }
-//
-//    var pushDeviceInfo = function () {
-//        if (self.isTracking()) {
-//            deviceSocket.emit("changed", deviceInfo);
-//        }
-//    }
-//
-//    var handleMotionEvent = function (event) {
-//        deviceInfo.motion = event;
-//        self.motion.apply(event);
-//    }
-//
-//    var handleOrientationEvent = function (event) {
-//        deviceInfo.orientation = event;
-//    }
-//
-//    if (this.isSupported()) {
-//        var deviceSocket = io("/device")
-//        deviceSocket.on('connect', function (evt) {
-//            deviceInfo.id = deviceSocket.id;
-//        });
-//    }
-//
-//    var subscription = -1;
-//    this.isTracking.subscribe(function (val) {
-//        // todo: check if we're already subscribed?
-//        if (val) {
-//            console.log("Subscribing to device motion");
-//            window.addEventListener("devicemotion", handleMotionEvent, true);
-//            window.addEventListener("deviceorientation", handleOrientationEvent, true);
-//
-//            if (!updateInterval) {
-//                updateInterval = 10000;
-//            }
-//            subscription = setInterval(pushDeviceInfo, updateInterval)
-//        } else {
-//            window.removeEventListener("devicemotion", handleMotionEvent, true);
-//            window.removeEventListener("deviceorientation", handleOrientationEvent, true)
-//            clearInterval(subscription);
-//        }
-//    })
-//}
 

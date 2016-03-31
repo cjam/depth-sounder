@@ -143,6 +143,7 @@ interface IChannel extends IUnique {
     gamma:number|KnockoutObservable<number>;
     beta:number|KnockoutObservable<number>;
     alpha:number|KnockoutObservable<number>;
+    color:string|KnockoutObservable<string>;
 }
 
 interface IMixer extends IUnique {
@@ -159,6 +160,7 @@ class ChannelViewModel extends ViewModelBase<IChannel> implements IChannel {
     gamma:KnockoutObservable<number>;
     beta:KnockoutObservable<number>;
     alpha:KnockoutObservable<number>;
+    color:KnockoutObservable<string>;
 
     modelName():string {
         return "channel";

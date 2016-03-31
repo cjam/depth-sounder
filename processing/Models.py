@@ -8,6 +8,7 @@ from audiolazy.lazy_io import AudioIO, chunks
 from audiolazy.lazy_misc import rint, sHz
 from audiolazy.lazy_stream import ControlStream, Stream, Streamix
 from flask.ext.socketio import emit
+import random
 from processing.Log import get_logger
 from processing.NeuralNet import Model
 
@@ -48,7 +49,19 @@ s, Hz = sHz(rate)
 inertia_dur = 1 * s
 inertia_filter = maverage(rint(inertia_dur))
 
-chunks.size = 4096
+chunks.size = 8192
+
+PALLETTE = [
+    "#5bc0eb",
+    "#fde74c",
+    "#9bc53d",
+    "#e55934",
+    "#fa7921"
+]
+
+
+def randomColor(pallette=PALLETTE):
+    return random.choice(pallette)
 
 
 class ModelBase(object):
@@ -66,7 +79,10 @@ class ModelBase(object):
 
 class Channel(ModelBase):
     def __init__(self, stream=Stream(0), **kwargs):
+        # Properties
         self.name = "channel"
+        self.color = randomColor()
+
         self._gainControl = ControlStream(1.0)
         self._enabledControl = ControlStream(1)
         self._stream = stream
@@ -105,6 +121,8 @@ class Channel(ModelBase):
     def _stream_has_attr(self, name):
         return name in self._stream.__dict__
 
+    # TODO: NEED INFRASTRUCTURE FOR BELOW (not sustainable, decorators?)
+
     @property
     def Gamma(self):
         return self._gamma.value;
@@ -129,7 +147,7 @@ class Channel(ModelBase):
     def Alpha(self):
         return self._alpha.value;
 
-    @Gamma.setter
+    @Alpha.setter
     def Alpha(self, val):
         current = self.Alpha
         if current != val:
@@ -219,6 +237,7 @@ class Channel(ModelBase):
         state["gamma"] = self.Gamma
         state["beta"] = self.Beta
         state["alpha"] = self.Alpha
+        state["color"] = self.color
         return state
 
 
@@ -310,7 +329,7 @@ class Mixer(ModelBase):
         # normalize channel state as dictionary
         ch_state = ch_state if isinstance(ch_state, dict) else ch_state.as_dict() if isinstance(ch_state,
                                                                                                 Channel) else {}
-        ch = self._get_channel(ch_state)
+        ch = self.get_channel(ch_state)
         if ch is not None:
             changes = dict_diff(ch.as_dict(), ch_state)
             if len(changes) > 0:
@@ -318,7 +337,7 @@ class Mixer(ModelBase):
             ch.set_state(ch_state)
             emit("channel_changed", ch.as_dict(), broadcast=True, include_self=False)
 
-    def _get_channel(self, model):
+    def get_channel(self, model):
         ch_id = model.get("id", -1) if isinstance(model, dict) else model.id if isinstance(model, ModelBase) else -1
         return self.channels.get(ch_id)
 

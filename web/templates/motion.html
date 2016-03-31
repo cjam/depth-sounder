@@ -1,38 +1,46 @@
 {% extends "base.html" %}
 
 {% block scripts %}
-{{ super() }}
-<script src="//d3js.org/d3.v3.min.js"></script>
-<script src="/static/clients/Motion.js"></script>
+    {{ super() }}
+    <script src="//d3js.org/d3.v3.min.js"></script>
+    <script src="/static/clients/Motion.js"></script>
+{% endblock %}
+
+{% block stylesheets %}
+    <!-- no stylesheets -->
 {% endblock %}
 
 {% block page_style %}
-{{ super() }}
+    {{ super() }}
 
-body{
-background:#000;
-}
+    body{
+    background:#000000;
+    margin:0
+    }
 
+    svg{
+    display:block;
+    }
 {% endblock %}
 
 {% block body %}
-<svg id="#visualRoot"></svg>
-<script type="text/javascript">
-    // prevent the default ios behavior
-    document.ontouchmove = function (event) {
-        event.preventDefault();
-    }
+    <svg id="visualRoot"></svg>
+    <script type="text/javascript">
+        // prevent the default ios behavior
+        document.ontouchmove = function (event) {
+            event.preventDefault();
+        }
 
-    $(document).ready(function () {
+        $(document).ready(function () {
 //        var hammer = Hammer(document);
 //        hammer.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
 //        hammer.on("swipe",function(evt){
 //           console.log("Swipe",evt)
 //        });
 
-        var deviceMotion = new DeviceMotionChannel();
-    });
-</script>
+            var deviceMotionVisual = new DeviceMotionVisual({svgId: "visualRoot"})
+        });
+    </script>
 
 
 {% endblock %}
