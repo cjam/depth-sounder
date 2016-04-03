@@ -349,6 +349,7 @@ class Mixer(ModelBase):
 
     def push(self, include_self=False):
         mixer_json = self.as_dict()
+        logger.debug("Pushing Mixer State %s", mixer_json)
         emit("mixer_changed", mixer_json, broadcast=True, include_self=include_self, namespace="/")
 
     def get_stream(self):

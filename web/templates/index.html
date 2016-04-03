@@ -1,6 +1,18 @@
 {% extends 'base.html' %}
 
+{% block scripts %}
+    {{ super() }}
+    <script>
+        $(document).ready(function () {
+            if (window.DeviceOrientationEvent == undefined || window.DeviceMotionEvent == undefined) {
+                $("#deviceMotionButton").prop("disabled", true);
+            }
+        })
+    </script>
+{% endblock %}
+
 {% block content %}
-<a href="/ui" class="btn btn-default">Graphical User Interface</a>
-<a href="/visual" class="btn btn-success">Visual Interface</a>
+    <a href="/ui" class="btn btn-default">Graphical User Interface</a>
+    <a href="/visual" class="btn btn-success">Visual Interface</a>
+    <a id="deviceMotionButton" href="/motion" class="btn btn-primary">Device Motion</a>
 {% endblock %}

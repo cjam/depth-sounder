@@ -67,9 +67,9 @@ class Domains {
 }
 
 class Scales {
-    static Gravity_To_Gain = Domains.Gravity.range([0, 4]).clamp(true);
+    static Gravity_To_Gain = Domains.Gravity.range([0, 1.0]).clamp(true);
 
-    static Compass_To_Gain = Domains.Compass.range([4, 0, 4]).clamp(true);
+    static Compass_To_Gain = Domains.Compass.range([1.0, 0, 1.0]).clamp(true);
     static Compass_To_X = Domains.Compass.range([-1, 0, 1]).clamp(true);
 }
 
@@ -128,6 +128,7 @@ abstract class D3Viz<T> {
         this.resizeVisual();
     }
 
+
     private resizeVisual() {
         this.preResizeVisual();
         // todo: should probably resize this using css width:100% etc
@@ -148,13 +149,21 @@ abstract class D3Viz<T> {
         if (data) {
             this._currentData = data;
         }
-        this.refresh();
+        this.refresh()
     }
 
     public refresh() {
+        var self = this;
+        window.requestAnimationFrame(()=> {
+            self.refreshInternal()
+        });
+    }
+
+    private refreshInternal() {
         if (this._currentData) {
             this.updateVisualization(this.svg, this._currentData)
         }
+
     }
 
     protected abstract updateVisualization(svg:d3.Selection<any>, data:T);
@@ -190,8 +199,6 @@ class DepthSounderVisual extends D3Viz<IMixer> {
         let self = this;
         var channelData = <IChannel[]>data.channels;
         var numChannels = channelData.length;
-
-        console.log("data updated", data);
 
         function razzleDazzle() {
             let curCircle = d3.select(this);
@@ -287,84 +294,159 @@ class DeviceMotionVisual extends D3Viz<IChannel> {
     public viewModel:ChannelViewModel;
     public motion:RxMotion;
 
-    public acceleration:KnockoutObservable<Vector>;
-    public velocity:KnockoutObservable<Vector>;
-    public position:KnockoutObservable<Vector>;
-
     public initialCompassHeading:number;
 
     constructor(options:D3ViewOptions) {
         super(options);
         let self = this;
-        this.motion = new RxMotion(10);
-        this.socket = SocketManager.GetSocket("/device");
-        this.initialCompassHeading = 0;
+        this.motion = new RxMotion(0);
 
-        this.socket.on("channel_updated", (data)=> {
-            if (self.viewModel) {
-                self.viewModel.apply(data);
-                console.log("Updated view model", self.viewModel);
-            }
-        });
-
-        this.socket.on("channel_added", (data)=> {
-            if (!self.viewModel) {
-                self.viewModel = new ChannelViewModel(data, {
-                    autoEmit: true,
-                    autoUpdate: false,
-                    ioNamespace: "/device"
-                });
-                console.log("Created view model", self.viewModel)
-
-                self.viewModel.dataStream.subscribe((d)=> {
-                    self.update(d);
-                });
-
-                self.svg.style("opacity", 0)
-                    .transition()
-                    .duration(2000)
-                    .ease(Math.sqrt)
-                    .style("background", data.color)
-                    .style("opacity", 1);
-
-                self.hookupMotion();
-                self.update(data);
-            }
-        });
-    }
-
-    public initialize() {
-        // store the first compass heading so we can normalize
+        // store the first compass heading so we can normalize motion relative to starting
         this.motion.compassHeading.first().subscribe((d)=> {
             this.initialCompassHeading = d;
         })
 
+        this.socket = SocketManager.GetSocket();
+
+        this.socket.on('reconnect', (d)=> {
+            console.log('reconnected', self.socket);
+            // request the channel be created
+            this.requestChannel()
+        })
+
+        //this.socket.on("channel_updated", (data)=> {
+        //    if (self.viewModel) {
+        //        self.viewModel.apply(data);
+        //        console.log("Updated view model", self.viewModel);
+        //    }
+        //});
+
+        this.socket.on("disconnect", ()=> {
+            this.$svg.fadeOut(200)
+        })
+
+        // request the channel be created
+        this.requestChannel()
+    }
+
+    private requestChannel() {
+
+        let createChannel = ()=> {
+            this.socket.emit("create_channel", (ch)=> {
+                console.log("channel created", ch);
+                this.initializeViewModel(ch);
+            });
+        }
+
+        // if the socket is already connected
+        if (this.socket.connected) {
+            createChannel()
+        } else {
+            // wait for connection
+            this.socket.once("connect", (d)=> {
+                createChannel();
+            })
+        }
+    }
+
+    private initializeViewModel(data:IChannel) {
+        // add in fields that we would like to add onto the channel
+        // accel
+        data.ax = 0;
+        data.ay = 0;
+        data.az = 0;
+
+        // accel with gravity
+        data.ax_g = 0;
+        data.ay_g = 0;
+        data.az_g = 0;
+
+        // velocity
+        data.vx = 0;
+        data.vy = 0;
+        data.vz = 0;
+        // position
+        data.px = 0;
+        data.py = 0;
+        data.pz = 0;
+
+        this.viewModel = new ChannelViewModel(data, {
+            autoEmit: true,
+            autoUpdate: false
+        });
+        console.log("Created view model", this.viewModel)
+
+        this.viewModel.dataStream.subscribe((d)=> {
+            this.update(d);
+        });
+
+        this.svg.style("opacity", 0)
+            .transition()
+            .duration(2000)
+            .ease(Math.sqrt)
+            .style("background", data.color)
+            .style("opacity", 1);
+
+        this.$svg.fadeIn(200);
+
+        this.hookupMotion();
+        this.update(data);
     }
 
     private hookupMotion() {
         let self = this;
-        this.initialize();
-        this.motion.accelerationIncludingGravity
-            .select(a=> a.z)
-            .select(Scales.Gravity_To_Gain)
-            .subscribe(this.viewModel.gain)
 
-        this.motion.compassHeading.select((d)=> {
-            let normalized = d - self.initialCompassHeading;
-            if (normalized < 0) {
-                normalized += 360;
+        this.motion.accelerationIncludingGravity.subscribe((a)=> {
+            this.viewModel.ax_g = a.x;
+            this.viewModel.ay_g = a.y;
+            this.viewModel.az_g = a.z;
+        });
+
+        this.motion.acceleration.subscribe((a)=> {
+            this.viewModel.ax = a.x;
+            this.viewModel.ay = a.y;
+            this.viewModel.az = a.z;
+        })
+
+        //this.motion.velocity.do((v)=>{console.log(v)}).subscribe((v)=> {
+        //    this.viewModel.vx = v.x;
+        //    this.viewModel.vy = v.y;
+        //    this.viewModel.vz = v.z;
+        //});
+
+        //this.motion.accelerationIncludingGravity
+        //    .select(a=> a.z)
+        //    .select(Scales.Gravity_To_Gain)
+        //    .subscribe(this.viewModel.gain)
+
+
+        var accelZSign = this.motion.accelerationIncludingGravity
+            .select((a)=>-a.z)              // flip it here so that positive represents the screen facing up
+            .select<number>(Math.sign);     // take the sign
+
+        this.motion.alpha.combineLatest(accelZSign, (alph, aSign)=> {
+            // Here we just transform the domain of this parameter so it fits into -90 -> 90
+            //if (alph < 0) {
+            //    alph += 360;
+            //}
+            //if(aSign < 0) {
+            //    alph -= alph > 180 ? 360 : 0
+            //}
+
+            if (aSign >= 0) {
+                alph -= alph > 180 ? 360 : 0;
+                return -alph;
+            } else {
+                alph -= 180
+                return -alph;
             }
-            // just some normalization to put it into a
-            // continuous domain (i.e. 90 -> 90)
-            normalized -= normalized > 180 ? 360 : 0;
-            return normalized
-        }).select((c)=>Scales.Compass_To_X(c))
-            .subscribe(this.viewModel.x);
+        }).subscribe(this.viewModel.alpha);
+
 
         // Wire up rotations
         this.motion.gamma.select(Math.round).subscribe(this.viewModel.gamma);
-        this.motion.alpha.select(Math.round).subscribe(this.viewModel.alpha);
-        this.motion.beta.select(Math.round).subscribe(this.viewModel.beta);
+
+        this.motion.beta.select(Math.round).do((d)=>console.log(d)).select(Math.abs).subscribe(this.viewModel.beta);
 
         //.do((d)=>console.log(d))
     }

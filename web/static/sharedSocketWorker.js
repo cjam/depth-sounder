@@ -5,9 +5,6 @@ importScripts('http://cdn.socket.io/socket.io-1.1.0.js');
 var socket = io(self.name),
     ports = [];
 
-
-self.randomValue = Math.random();
-
 onconnect = function (connectEvt) {
     var port = connectEvt.ports[0];
     ports.push(port);
@@ -18,6 +15,10 @@ onconnect = function (connectEvt) {
             port.postMessage({type: eventName, message: msg});
         });
         port.postMessage({type: "_listening", message: eventName})
+    }
+
+    if (socket.connected) {
+        port.postMessage({type: "_connect", message: {}})
     }
 
     port.start();

@@ -8,6 +8,7 @@ dask==0.8.0
 decorator==4.0.9
 eventlet==0.18.4
 Flask==0.10.1
+Flask-Bower==1.2.1
 Flask-SocketIO==2.1
 functools32==3.2.3.post2
 gnureadline==6.3.3
@@ -31,6 +32,7 @@ pickleshare==0.6
 Pillow==3.1.1
 ptyprocess==0.5.1
 pylab==0.1.3
+pyOSC==0.3.5b5294
 pyparsing==2.1.0
 python-dateutil==2.5.0
 python-engineio==0.8.8
@@ -47,6 +49,7 @@ singledispatch==3.4.0.3
 six==1.10.0
 sympy==0.7.6.1
 Theano==0.7.0
+-e git+https://github.com/JonathanRaiman/theano_lstm@cde036da62aeed1b661a76f55f13db7a6fe52e63#egg=theano_lstm
 toolz==0.7.4
 tornado==4.3
 traitlets==4.1.0

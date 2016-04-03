@@ -43,6 +43,7 @@ declare class Emitter {
 
 interface ISocket extends Emitter {
     close();
+    connected:boolean;
 }
 
 const SharedWorkerUri:string = "/static/sharedSocketWorker.js";
@@ -55,6 +56,7 @@ interface ISharedSocketMessage {
 class SharedSocket extends Emitter implements ISocket {
     private worker:SharedWorker;
     private messageSubject:Rx.Subject<ISharedSocketMessage>;
+    public connected:boolean;
 
     constructor(private ioNamespace:string = "/") {
         super();
@@ -82,9 +84,11 @@ class SharedSocket extends Emitter implements ISocket {
         switch (type) {
             case '_connect':
                 eventName = 'connect';
+                this.connected = true;
                 break;
             case '_disconnect':
                 eventName = 'disconnect';
+                this.connected = false;
                 break;
         }
         this.emit(eventName, message);
@@ -116,7 +120,6 @@ class SharedSocket extends Emitter implements ISocket {
         throw new Error("Not Implemented");
     }
 }
-
 
 class SocketManager {
     private static sockets:{[id:string]:ISocket;} = {}

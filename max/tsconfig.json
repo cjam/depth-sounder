@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "es3",
+    "noImplicitAny": false,
+    "outDir": "./depth-sounder/code/",
+    "rootDir": ".",
+    "sourceMap": false
+  },
+  "exclude": [
+    "node_modules"
+  ]
+}

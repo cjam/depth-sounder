@@ -1,6 +1,6 @@
 import logging
 
-level = logging.INFO
+level = logging.WARN
 
 
 def get_logger(name):

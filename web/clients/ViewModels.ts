@@ -84,7 +84,7 @@ abstract class ViewModelBase<T extends IUnique> implements IObservableViewModel,
         // Auto Emit
         this.autoEmit = ko.observable<boolean>(options.autoEmit || false);
         var emitStream = this.dataStream.where((d)=>self.autoEmit()).pausable();
-        emitStream.throttle(10).subscribe((d)=> {
+        emitStream.throttle(20).subscribe((d)=> {
             self.emit();
         });
 

@@ -1,12 +1,16 @@
+import argparse
 import logging
+import random
 import time
 import traceback
+from OSC import OSCBundle, OSCMessage
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, send
 from processing.Log import get_logger
 from processing.Models import Channel, Mixer
 import socket
 from processing.SynthStream import SynthStream
+from Workers import OSCWorker
 
 
 def norecurse(f):
@@ -20,7 +24,7 @@ def norecurse(f):
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode="eventlet")
 
 logger = get_logger(__name__)
 
@@ -66,28 +70,44 @@ def tests():
 
 @socketio.on_error_default  # handles all namespaces without an explicit error handler
 def default_error_handler(e):
-    logger.error("SocketIO_Error: %s", e.message)
+    logger.error("SocketIO_Error: %s", str(e))
 
 
 # MODELS
 
+@socketio.on("create_channel")
+def create_channel():
+    logger.info("Channel requested for %s", request.sid)
+    global mixer
+    global device_num
+    id = request.sid
+    ch = Channel(SynthStream(), id=id, name="Device: " + (++device_num).__str__(), enabled=True, gain=0.0)
+
+    # send the message via osc to add a channel
+    msg = OSCMessage("/channels/add")
+    msg.append(ch.id)
+    oscWorker.send(msg);
+
+    mixer.add_channel(ch)
+    mixer.push()
+
+    # Return the new channel back to the requester
+    return ch.as_dict()
+
+
 @socketio.on('update_channel')
 def update_channel(ch_json):
     global mixer
-    ch = mixer.get_channel(ch_json)
-    ch.set_state(ch_json)
-    mixer.push()
-
-
-@socketio.on('update_channel', '/device')
-def on_device_channel_update(channel_state):
-    global mixer
+    global oscWorker
     try:
-        mixer.set_channel_state(channel_state)
-        mixer.push()
+        chAddress = "/channel/" + ch_json["id"]
+        mixer.set_channel_state(ch_json)
+        oscWorker.send_json(ch_json, chAddress)
+        # mixer_json = mixer.as_dict()
+        # logger.debug("emitting mixer_json %s",mixer_json)
+        # emit("mixer_changed", mixer.as_dict(), broadcast=True, namespace="/")
     except Exception, e:
-        logger.error("Error occured while trying to set channel state", e)
-
+        logger.error("Error occured while trying to set channel state %s", e)
 
 @socketio.on('update_mixer')
 def mixer_updated(mixer_json):
@@ -96,13 +116,13 @@ def mixer_updated(mixer_json):
     mixer.set_state(mixer_json)
     mixer.push()
 
-
 # CONTROLS
 @socketio.on('start_audio')
 def start_audio(message):
     global mixer
     mixer.IsPlaying = True
     mixer.push()
+
 
 @socketio.on('stop_audio')
 def stop_audio(message):
@@ -112,33 +132,6 @@ def stop_audio(message):
 
 
 # CONNECTIONS
-
-@socketio.on('connect', '/device')
-def on_device_connect():
-    logger.info("Device Connected %s", request.sid)
-    global mixer
-    global device_num
-    id = request.sid
-    ch = Channel(SynthStream(), id=id, name="Device: " + (++device_num).__str__(), enabled=True, gain=0.0)
-    mixer.add_channel(ch)
-    mixer.push()
-    emit("channel_added", ch.as_dict(), namespace="/device")
-
-
-@norecurse
-@socketio.on('disconnect', '/device')
-def on_device_disconnect():
-    global mixer
-    id = request.sid
-    logger.info("Device Disconnected %s", id)
-    mixer.remove_channel(id)
-    # have been running into issues with sockets recursive calls, trying
-    # to sleep so that this socket may be removed from socket io before
-    # we do a push. Only doing it on device disconnect since a delay
-    # here isn't a huge deal
-    time.sleep(0.5)
-    mixer.push()
-
 
 @socketio.on('connect')
 def on_connect():
@@ -153,9 +146,33 @@ def on_connect():
 
 @socketio.on('disconnect')
 def on_disconnect():
-    print("Client Connected:  " + request.sid.__str__())
+    clientId = request.sid.__str__()
+    print("Client Disconnected:  " + clientId)
+    global mixer
+    logger.info("Device Disconnected %s", clientId)
+    mixer.remove_channel(clientId)
+
+    # send the message via osc to add a channel
+    msg = OSCMessage("/channels/remove")
+    msg.append(clientId)
+    oscWorker.send(msg);
+    # have been running into issues with sockets recursive calls, trying
+    # to sleep so that this socket may be removed from socket io before
+    # we do a push. Only doing it on device disconnect since a delay
+    # here isn't a huge deal
+    time.sleep(0.5)
+    mixer.push()
+
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--osc_ip", default="127.0.0.1", help="The ip of the OSC server")
+    parser.add_argument("--osc_port", type=int, default=7402, help="The port the OSC server is listening on")
+    args = parser.parse_args()
+
+    global oscWorker;
+    oscWorker = OSCWorker(num_threads=4)
+
     global mixer
     mixer = Mixer()
     channels = [
@@ -174,13 +191,9 @@ if __name__ == '__main__':
         print("adding " + ch.id.__str__())
         mixer.add_channel(ch)
 
-    mixer.IsPlaying = False
-
     # Start our Web app
     print "Current IP Addresses:", [l for l in (
         [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [
             [(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in
              [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    socketio.run(app, host='0.0.0.0', debug=True)
-
-    mixer.close()
+    socketio.run(app, host='0.0.0.0', debug=False)

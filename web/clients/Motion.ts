@@ -28,6 +28,8 @@ interface IDeviceOrientation {
 
 // EXTENSIONS
 
+var rxObservableProto = <Rx.Observable<Vector>>(Rx.Observable).prototype;
+
 class IntegratingObservable extends Rx.Observable implements Rx.IObservable<Vector> {
     public subscribe(observer:Rx.Observer<Vector>):Rx.IDisposable {
         return this.integration.subscribe(observer);
@@ -84,18 +86,30 @@ class IntegratingObservable extends Rx.Observable implements Rx.IObservable<Vect
     }
 }
 
-Rx.Observable.Integrate = function ():IntegratingObservable {
+rxObservableProto.integrate = function ():IntegratingObservable {
     var source:Rx.Observable<Vector> = this;
     return new IntegratingObservable(source);
+}
+
+rxObservableProto.vectorAverage = function (numSamples:number = 100, threshold:Vector = new Vector(0.2, 0.2, 0.2)):Rx.Observable<Vector> {
+    var source:Rx.Observable<Vector> = this;
+    return source.bufferWithCount(numSamples, 1)
+        .select((samples:Vector[])=> {
+            var temp = new Vector();
+            samples.forEach((s)=> {
+                temp = temp.add(s);
+            })
+            temp = temp.divide(samples.length)
+            temp.x = Math.abs(temp.x) < threshold.x ? 0 : temp.x;
+            temp.y = Math.abs(temp.y) < threshold.y ? 0 : temp.y;
+            temp.z = Math.abs(temp.z) < threshold.z ? 0 : temp.z;
+            return temp;
+        });
 }
 
 
 /// RxMotion wrapper class for motion api
 class RxMotion {
-    private accel_threshold:Vector = new Vector(0.2, 0.2, 0.2);
-    private vel_threshold:Vector = new Vector(0.2, 0.2, 0.2);
-    private pos_threshold:Vector = new Vector(0.5, 0.5, 0.5);
-
     public isSupported:KnockoutObservable<boolean>
     public samplingInterval:KnockoutObservable<number>
 
@@ -109,13 +123,9 @@ class RxMotion {
     public accelerationIncludingGravity:Rx.Observable<Vector>
     public rotationRate:Rx.Observable<number>
 
-    public averageAcceleration:Rx.Observable<Vector>;
-
     // Calculated integrals
     public velocity:IntegratingObservable;
-    public averageVelocity:Rx.Observable<Vector>;
     public position:IntegratingObservable;
-    public averagePosition:Rx.Observable<Vector>;
 
     // Device Orientation
     public orientation:Rx.Observable<IDeviceOrientation>;
@@ -146,17 +156,14 @@ class RxMotion {
         this.motion = this._motionSubject.asObservable();
 
         this.acceleration = this.motion.pluck<IVector>("acceleration").select(Vector.fromData);
-        this.averageAcceleration = RxMotion.vectorAverage(this.acceleration, 100, this.accel_threshold);
+        this.accelerationIncludingGravity = this.motion.pluck<IVector>("accelerationIncludingGravity").select(Vector.fromData);
 
-        this.accelerationIncludingGravity = RxMotion.vectorAverage(this.motion.pluck<IVector>("accelerationIncludingGravity").select(Vector.fromData), 100, this.accel_threshold);
-        ;
+
         this.rotationRate = this.motion.pluck<number>("rotationRate");
 
-        this.velocity = new IntegratingObservable(this.averageAcceleration)
-        this.averageVelocity = RxMotion.vectorAverage(this.velocity, 100, this.vel_threshold);
+        this.velocity = this.acceleration.vectorAverage(100, new Vector(0.2, 0.2, 0.3)).integrate()
 
         this.position = new IntegratingObservable(this.velocity);
-        this.averagePosition = RxMotion.vectorAverage(this.position, 100, this.pos_threshold);
 
         // Device Orientation
         this.orientation = this._orientationSubject.asObservable();
@@ -175,21 +182,6 @@ class RxMotion {
 
         // Set the sampling interval to initialize things
         this.samplingInterval(samplingInterval || 100);
-    }
-
-    public static vectorAverage<Vector>(source:Rx.Observable<Vector>, numSamples:number = 100, threshold:Vector = new Vector()):Rx.Observable<Vector> {
-        return source.bufferWithCount(numSamples, 1)
-            .select((samples:Vector[])=> {
-                var temp = new Vector();
-                samples.forEach((s)=> {
-                    temp = temp.add(s);
-                })
-                temp = temp.divide(samples.length)
-                temp.x = Math.abs(temp.x) < threshold.x ? 0 : temp.x;
-                temp.y = Math.abs(temp.y) < threshold.y ? 0 : temp.y;
-                temp.z = Math.abs(temp.z) < threshold.z ? 0 : temp.z;
-                return temp;
-            });
     }
 
     private handleSampleIntervalChanged(newInterval) {
